@@ -2488,12 +2488,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"root-workspace-0b6124@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "root-workspace-0b6124@workspace:."
-  languageName: unknown
-  linkType: soft
-
 "run-parallel@npm:^1.1.9":
   version: 1.2.0
   resolution: "run-parallel@npm:1.2.0"
@@ -2911,9 +2905,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undersea@workspace:undersea":
+"undersea@workspace:.":
   version: 0.0.0-use.local
-  resolution: "undersea@workspace:undersea"
+  resolution: "undersea@workspace:."
   dependencies:
     "@types/ws": "npm:^8"
     typescript: "npm:~5.0.0"

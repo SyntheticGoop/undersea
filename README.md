@@ -458,12 +458,12 @@ Install it directly from github with your relavant package manager. This is supp
 
 Or just clone the repository and use it as a local package.
 
-Note that the framework is located in a subdirectory of a subpackage of the repository.
+Note that the framework is located in a subdirectory of the repository.
 You will want to import the files from 
 ```ts
-import from "undersea/undersea/framework"
-import from "undersea/undersea/clients/*"
-import from "undersea/undersea/lib/Socket"
+import from "undersea/framework"
+import from "undersea/clients/*"
+import from "undersea/lib/Socket"
 ```
 
 Default package exports are a bitch to maintain and I seriously can't be fucked.
