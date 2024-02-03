@@ -1,5 +1,6 @@
 {
   "packageManager": "yarn@4.0.2",
+  "license": "GPL-3.0",
   "workspaces": [
     "example",
     "undersea"
