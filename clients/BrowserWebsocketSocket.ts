@@ -1,6 +1,6 @@
 import { VirtualSocket } from "./VirtualSocket";
 
-export class BrowserWsWebsocketSocket extends VirtualSocket {
+export class BrowserWebsocketSocket extends VirtualSocket {
 	constructor(
 		private readonly socket: WebSocket,
 		bufferSize: {
