@@ -39,6 +39,9 @@ export class Router<
 			codec: { ...DEFAULT_CODEC, ...context?.codec },
 			config: { ...DEFAULT_CONFIG, ...context?.config },
 		};
+
+		this.route = this.route.bind(this);
+		this.finalize = this.finalize.bind(this);
 	}
 
 	/**
