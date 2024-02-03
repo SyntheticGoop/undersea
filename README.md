@@ -55,7 +55,7 @@ export type ClientState; // State shared on the entire client (e.g. user session
 export type ServerConnectionState; // State shared within a connection (e.g. user session)
 export type ClientConnectionState; // State shared within a connection (e.g. server session)
 
-export const router = new Router<ServerState, ClientState, ServerConnectionState, ClientConnectionState>(
+export const { route, finalize } = new Router<ServerState, ClientState, ServerConnectionState, ClientConnectionState>(
   // Optional configuration overrides for the router.
   {
     // Encoding and decoding options. Uses binary representation of JSON by default.
@@ -82,7 +82,7 @@ However, you must import them back before finalizing the router.
 export type DataServerReceives; // The data the server receives from the client.
 export type DataClientReceives; // The data the client receives from the server.
 
-export const { client, server } = router.route<
+export const { client, server } = route<
   "client", // To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
   "send", // Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
   DataServerReceives,
@@ -103,8 +103,9 @@ If you're using separate files for the route definitions, you must import them
 before finalizing the router.
 
 ```ts
+import { finalize } from "./api"
 export * as someApiRoute from "./someApiRoute"
-export const { bindServer, bindClient } = router.finalize()
+export const { bindServer, bindClient } = finalize()
 ```
 
 Since creating a route is a side effect that modifies the router, the import
