@@ -41,13 +41,6 @@ describe("Initiate-Endpoint", async () => {
 		},
 		codec,
 		key,
-		late: async () => {
-			return {
-				app: null,
-				connection: null,
-				socket: endpointSocket.multiplex(),
-			};
-		},
 		createService() {
 			const buffer = new CircularBuffer<string | null>(10);
 
@@ -80,13 +73,6 @@ describe("Initiate-Endpoint", async () => {
 		},
 		codec,
 		key,
-		late: async () => {
-			return {
-				app: null,
-				connection: null,
-				socket: initiateSocket.multiplex(),
-			};
-		},
 		createService() {
 			const send = new CircularBuffer<string | null>(10);
 			const recv = new CircularBuffer<string>(10);
@@ -117,8 +103,20 @@ describe("Initiate-Endpoint", async () => {
 		},
 	});
 
-	const _server = endpoint.start();
-
+	const _server = endpoint.start(async () => {
+		return {
+			app: null,
+			connection: null,
+			socket: endpointSocket.multiplex(),
+		};
+	});
+	async function clientAction() {
+		return {
+			app: null,
+			connection: null,
+			socket: initiateSocket.multiplex(),
+		};
+	}
 	it("has initial multiplexed connections", () => {
 		// Endpoint uses 1 for main socket and 2 for open listener.
 		expect(endpointSocketListeners()).toBe(3);
@@ -129,7 +127,7 @@ describe("Initiate-Endpoint", async () => {
 
 	it("opens a connection between initiator and endpoint", async () => {
 		expect(endpointSocketListeners()).toBe(3);
-		const client = await initiate.start();
+		const client = await initiate.start(clientAction);
 
 		client.loadInternal("dog");
 		client.loadInternal("cat");
@@ -148,7 +146,7 @@ describe("Initiate-Endpoint", async () => {
 	});
 
 	it("opens a second connection between initiator and endpoint", async () => {
-		const client = await initiate.start();
+		const client = await initiate.start(clientAction);
 		client.send.push("mom");
 		client.send.push("dad");
 		client.send.push("kid");
@@ -166,12 +164,12 @@ describe("Initiate-Endpoint", async () => {
 	});
 
 	it("correctly multiplexes connections", async () => {
-		const client1 = await initiate.start();
+		const client1 = await initiate.start(clientAction);
 		// Because we're testing this in a single thread,
 		// we must yield to the event loop to allow the
 		// server to properly buffer the connection.
 		await new Promise((ok) => setTimeout(ok, 1));
-		const client2 = await initiate.start();
+		const client2 = await initiate.start(clientAction);
 		const recv2 = client2.recv.take();
 		const recv1 = client1.recv.take();
 		client1.send.push("cos");

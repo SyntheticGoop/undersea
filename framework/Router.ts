@@ -34,10 +34,10 @@ export class Router<
 		config: Config;
 	};
 
-	constructor(context: { codec?: Partial<Codec>; config?: Partial<Config> }) {
+	constructor(context?: { codec?: Partial<Codec>; config?: Partial<Config> }) {
 		this.context = {
-			codec: { ...DEFAULT_CODEC, ...context.codec },
-			config: { ...DEFAULT_CONFIG, ...context.config },
+			codec: { ...DEFAULT_CODEC, ...context?.codec },
+			config: { ...DEFAULT_CONFIG, ...context?.config },
 		};
 	}
 
