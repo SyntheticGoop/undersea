@@ -70,10 +70,21 @@ export class Router<
 	/**
 	 * Registers a new route, allowing for methods to be bound to the routes.
 	 *
+	 * Route types are as follows:
+	 * - "send": A single request and response.
+	 * - "send stream": Repeated requests and response pairs.
+	 * - "stream": A continuous stream of data in one direction only.
+	 * - "duplex": A continuous stream of data in both directions.
+	 *
+	 * @param type Route type. One of "query", "query stream", "stream", "duplex".
 	 * @param config Route configuration.
-	 * @returns
 	 */
-	public route<ServerRecv, ClientRecv>(config?: Config) {
+	public route<
+		Source extends "server" | "client",
+		Type extends "send" | "send stream" | "stream" | "duplex",
+		ServerRecv,
+		ClientRecv,
+	>(config?: Config) {
 		if (this.finalized) {
 			throw new Error("Router has been finalized");
 		}
@@ -103,8 +114,50 @@ export class Router<
 		this.routes.push({ server, client });
 
 		return {
-			server,
-			client,
+			server: server as Pick<
+				typeof server,
+				Source extends "server"
+					? Type extends "send"
+						? "asSend"
+						: Type extends "send stream"
+						  ? "asSendStream"
+						  : Type extends "stream"
+							  ? "asSendStreamOnly"
+							  : Type extends "duplex"
+								  ? "asSendDuplex"
+								  : never
+					: Type extends "send"
+					  ? "asRecv"
+					  : Type extends "send stream"
+						  ? "asRecvStream"
+						  : Type extends "stream"
+							  ? "asRecvStreamOnly"
+							  : Type extends "duplex"
+								  ? "asRecvDuplex"
+								  : never
+			>,
+			client: client as Pick<
+				typeof client,
+				Source extends "client"
+					? Type extends "send"
+						? "asSend"
+						: Type extends "send stream"
+						  ? "asSendStream"
+						  : Type extends "stream"
+							  ? "asSendStreamOnly"
+							  : Type extends "duplex"
+								  ? "asSendDuplex"
+								  : never
+					: Type extends "send"
+					  ? "asRecv"
+					  : Type extends "send stream"
+						  ? "asRecvStream"
+						  : Type extends "stream"
+							  ? "asRecvStreamOnly"
+							  : Type extends "duplex"
+								  ? "asRecvDuplex"
+								  : never
+			>,
 		};
 	}
 

@@ -1,6 +1,31 @@
-# undersea
+- [Undersea](#undersea)
+  - [Where does this name come from?](#where-does-this-name-come-from)
+  - [Why?](#why)
+  - [Should I use this?](#should-i-use-this)
+  - [Why not \[insert other framework here\]?](#why-not-insert-other-framework-here)
+  - [Why did you make this then?](#why-did-you-make-this-then)
+  - [Example usage](#example-usage)
+        - [Shared API definition](#shared-api-definition)
+        - [Route action](#route-action)
+        - [Using the route](#using-the-route)
+        - [Error handling](#error-handling)
+        - [Testing](#testing)
+        - [Security](#security)
+        - [Reliability](#reliability)
+        - [Performance](#performance)
+  - [Okay I still want to use this. How do I install it?](#okay-i-still-want-to-use-this-how-do-i-install-it)
+        - [Warning on bundling](#warning-on-bundling)
+        - [Using with frameworks like `nextjs`](#using-with-frameworks-like-nextjs)
+        - [A note on versioning](#a-note-on-versioning)
+  - [Technical dive behind the design](#technical-dive-behind-the-design)
+
+# Undersea
 
 Undersea is a framework for building type safe, bidirectional communication between a server and a client.
+
+## Where does this name come from?
+
+The undersea cables that connect the world are the backbone of the internet.
 
 ## Why?
 
@@ -17,6 +42,8 @@ Why not? It's a free country.
 ## Why did you make this then?
 
 Partly as an experiment, but also because I dislike how other frameworks operate.
+
+## Example usage
 
 ##### Shared API definition
 ```ts
@@ -55,7 +82,12 @@ However, you must import them back before finalizing the router.
 export type DataServerReceives; // The data the server receives from the client.
 export type DataClientReceives; // The data the client receives from the server.
 
-export const { client, server } = router.route<DataServerReceives, DataClientReceives>(
+export const { client, server } = router.route<
+  "client", // To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
+  "send", // Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
+  DataServerReceives,
+  DataClientReceives
+>(
   // This is optional. It will inherit the configuration from the router if not provided.
   {
     ackDeadline: 5000, // Change how long the server waits for a message ack.
@@ -90,9 +122,19 @@ will mismatch and you will get data errors.
 
 Once your api is defined, you must define the handlers for the server and the client.
 
+Which handlers you can pick depends on your route definition.
+
 There are two types of routes `recv` and `send` routes.
 The `recv` are where the server actions are defined.
 The `send` routes are the type safe client bindings to those actions.
+
+The initiating side of the connection will always use `send` routes and the responding side will always use `recv` routes.
+
+In your route definition you will be asked to define who is initiating the connection.
+```ts
+router.route<"client", _, _, _> // The client is initiating the connection.
+router.route<"server", _, _, _> // The server is initiating the connection.
+```
 
 With these two types of routes there are 4 different variants of routes.
 
@@ -109,7 +151,15 @@ With these two types of routes there are 4 different variants of routes.
 - `asSendStreamDuplex` and `asRecvStreamDuplex`: These are long lived streams that can be used to send and receive streams from the connection.
   These function as a combination of `asSendStreamOnly` and `asRecvStreamOnly`, allowing a two way stream of data that does not wait on either side for a response.
 
-You may a validation function for the responses to all routes as you may not want to trust the other side of the connection. The exception to this is the `asSendStreamOnly` as it never receives a response.
+You will make this choice when you're defining the route.
+```ts
+router.route<_, "send", _, _> // `asSend` or `asRecv`
+router.route<_, "send stream", _, _> // `asSendStream` or `asRecvStream`
+router.route<_, "stream", _, _> // `asSendStreamOnly` or `asRecvStreamOnly`
+router.route<_, "duplex", _, _> // `asSendStreamDuplex` or `asRecvStreamDuplex`
+```
+
+You may write a validation function for the responses to all routes as you may not want to trust the other side of the connection. The exception to this is the `asSendStreamOnly` as it never receives a response.
 
 Additionally, for all `stream` type connections, you must set a buffer size.
 If the buffer is full:
@@ -129,7 +179,6 @@ function validator(data: unknown): data is someApiRoute.DataServerReceives {
   // Your validation logic here
   return true
 }
-
 
 export const apiRoute = someApiRoute.server.asRecv(
   () => {
@@ -163,37 +212,34 @@ export const apiRoute = someApiRoute.server.asRecv(
       // Use the task to abort the route if necessary.
       streamSharedState++
 
-      return null as someApiRoute.DataClientReceives
+      return someApiRoute.DataClientReceives
     }
   }
 )
-
 ```
 
-Things are simpler on the client as there is only one connection to manage.
+Things are simpler on the client as we only need to present a type safe 
+interface to the api route (if it is a `send` route).
 
 __On the client__
 ```ts
 
 import { someApiRoute } from "./api"
 
+// This creates a function that you may use to call after you've bound the socket.
 export const apiRoute = someApiRoute.client.asSend()
-
 ```
 
 Note that `send` and `recv` routes are not exclusive to the client or the server.
 You can have a `send` route on the server and a `recv` route on the client.
-
-Another gotcha when defining routes is accidentally pairing up the wrong `send` and `recv` types.
-For example, pairing a `asSend` with a `asRecvStream` may look like it's working,
-but you're effectively creating many open streams that eventually timeout.
+The way these routes are declared on both the server and the client is the same.
 
 ##### Using the route
 
 Now that you've finally defined the route, you can use it in your application.
 
-The route doesn't dictate how you broker and manage the duplex connections, only
-the connections implement the `Socket` interface.
+This framework doesn't dictate how you broker and manage the duplex connections, only
+that the connections implement the `Socket` interface.
 
 This interface can be found in `lib/Socket.ts`.
 
@@ -212,24 +258,27 @@ __On the server__
 ```ts
 import { WebSocketServer } from "ws";
 import { NodeWsWebsocketSocket } from "undersea/clients/NodeWsWebsocketSocket";
+import { ServerState, ServerConnectionState } from "./api"
 import { apiRoute } from "./server"
 
+// Create a function that will keep the server running.
 async function createServerWebsocketConnection() {
-	while (true) {
-		const server = new WebSocketServer({ port: 54321 });
+  while (true) {
+    const server = new WebSocketServer({ port: 54321 });
 
-		await new Promise((up) => {
-			server.on("listening", up);
-		});
+    await new Promise((up) => {
+      server.on("listening", up);
+    });
 
     // When a new client connects, you must spawn an entire new socket and api
     // for that connection.
     //
     // This is because the api is stateful.
-		server.on("connection", async (ws) => {
+    server.on("connection", async (ws) => {
 
       // Create a new socket for the connection.
-			const socket = new NodeWsWebsocketSocket(ws, 
+      const socket = new NodeWsWebsocketSocket(
+        ws, 
         // You must set up how many messages the api is allowed to buffer.
         // Be judicious with this limit. You do not need nearly as many buffered
         // messages as you think you do.
@@ -241,7 +290,7 @@ async function createServerWebsocketConnection() {
       // When creating bindings, what we're doing is essentially
       // providing the various runtime contexts to the api that
       // we could not otherwise statically provide.
-			const server = bindServer(
+      const server = bindServer(
         ServerState,
         async () => ({
           connection: ServerConnectionState,
@@ -250,13 +299,16 @@ async function createServerWebsocketConnection() {
       );
 
       // Bind the api route to the server.
+      // This api route needs to be bound separately for each connection.
+      //
+      // It will now begin handling requests to the route.
       apiRoute(server);
-		});
+    });
 
-		await new Promise((ok) => {
-			server.on("close", ok);
-		});
-	}
+    await new Promise((ok) => {
+      server.on("close", ok);
+    });
+  }
 }
 
 createServerWebsocketConnection();
@@ -265,16 +317,18 @@ createServerWebsocketConnection();
 __On the client__
 ```ts
 import { BrowserWebsocketSocket } from "undersea/clients/BrowserWebsocketSocket";
+import { ClientState, ClientConnectionState, someApiRoute } from "./api"
 import { apiRoute } from "./server"
 
 let socket: BrowserWebsocketSocket;
 
+// Create a function that will keep the socket alive.
 async function persistentWebsocketConnection() {
   while (true) {
     const websocket = new WebSocket('wss://your.websocket');
 
     // Create a new socket for the connection.
-    socket = new BrowserWsWebsocketSocket(
+    socket = new BrowserWebsocketSocket(
       websocket, 
       // You must set up how many messages the api is allowed to buffer.
       // Be judicious with this limit. You do not need nearly as many buffered
@@ -301,9 +355,15 @@ const client = bindClient(
   })
 )
 
+// Before use, the api route must be bound to the client.
+// Since the client is kept alive you can choose to bind the api route
+// once and export it to the rest of your application.
+//
+// Errors in the binding will be thrown when the route is used.
 const api = apiRoute(client);
 
-await api(someApiRoute.DataServerReceives)
+// This now works.
+const response = await api(someApiRoute.DataServerReceives)
 ```
 
 ##### Error handling
@@ -346,6 +406,8 @@ The million dollar question eh?
 
 Realistically, this is not going to be very fast or handle a lot of connections.
 
+REST APIs will always allow you to handle more connections as they are short lived.
+
 You still have to make engineering decisions on how you use this framework.
 
 Here are the limits you may run into, depending on your use case:
@@ -370,3 +432,62 @@ Here are the limits you may run into, depending on your use case:
   The requests can be handled one at a time with ease.
   Contrast with this, 1000 clients will maintain 1000 active connections to the server at all times.
   These connections will take up memory and CPU time to maintain all the relevant listeners for.
+  You should consider that a single server has a finite amount of compute and therefore
+  connections it can hold. Implement rate limits to prevent your server from crashing
+  and instead scale horizontally.
+
+- Connections are randomly being dropped.
+  Check for the following:
+  - Do you have enough ack timeout? The more connections you have, the more timeouts you will need.
+  - Do you need larger buffers? If the server is slow to respond to a burst of messages, you will need a bigger buffer.
+  - Is your connection itself flaky? We do not handle reconnection, retrying failed messages, or any other kind of reliability.
+
+- High memory usage on the client.
+  You need to think about how much data you're receiving and how much you're buffering.
+  We make sure we free any memory we don't need as soon as possible, so it is likely a fundamental
+  design issue.
+
+There are definitely performance improvements that can be made, but I'll need a better understanding
+on how memory is handled and how to better schedule tasks in nodejs. We're currently abusing promises to get this to work.
+
+## Okay I still want to use this. How do I install it?
+
+This is currently not published on `npm` because I don't like using it.
+
+Install it directly from github with your relavant package manager. This is supported by `npm`, `yarn`, `pnpm` and `bun`.
+
+Or just clone the repository and use it as a local package.
+
+Note that the framework is located in a subdirectory of a subpackage of the repository.
+You will want to import the files from 
+```ts
+import from "undersea/undersea/framework"
+import from "undersea/undersea/clients/*"
+import from "undersea/undersea/lib/Socket"
+```
+
+Default package exports are a bitch to maintain and I seriously can't be fucked.
+Import exactly what you're using from the source code.
+
+
+##### Warning on bundling
+
+You are required to use a bundler that can compile a `typescript` dependency as
+this only ships with `typescript` source files.
+
+Personally I would use `vite-node`, `deno` or `bun` as typescript is handled
+natively in these environments.
+
+##### Using with frameworks like `nextjs`
+
+Don't know. Haven't tried it. You're on your own.
+
+##### A note on versioning
+
+We're currently using "whatever the fuck I feel like versioning".
+
+Lock your version to an exact number.
+
+## Technical dive behind the design
+
+I'll write this if I feel like it. You can attempt to read the source but good luck with that.
