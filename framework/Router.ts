@@ -288,7 +288,7 @@ export class Router {
 
 		const types = {
 			client: method.startsWith("client") ? "client" : "server",
-			server: method.startsWith("server") ? "server" : "client",
+			server: method.startsWith("server") ? "client" : "server",
 		} as const;
 
 		self.routeTypes.push(types);

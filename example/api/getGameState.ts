@@ -1,4 +1,4 @@
-import { router } from "./router";
+import { route0000 } from ".";
 
 export type GameTick = {
 	time: number;
@@ -17,8 +17,4 @@ export type GameState = {
 		y: number;
 	};
 };
-export const { client, server } = router.route<
-	"client send stream",
-	GameTick,
-	GameState
->();
+export const { client, server } = route0000.define<GameTick, GameState>();

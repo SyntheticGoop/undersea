@@ -4,7 +4,8 @@ import { createSignal, onMount } from "solid-js";
 import { PositionControl } from "./PositionControl";
 import {BrowserWebsocketSocket} from "../../../clients/BrowserWebsocketSocket"
 import { clientRouter  } from "../../api";
-import { setTableSize, getGameState } from "../../api";
+import * as getGameState from "../../api/getGameState";
+import * as setTableSize from "../../api/setTableSize";
 
 const getGameStateHandler = getGameState.client.asSendStream(10);
 const setTableSizeHandler = setTableSize.client.asSendStreamOnly(50);

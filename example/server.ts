@@ -1,6 +1,8 @@
 import { WebSocketServer } from "ws";
 import { PongGameEngine } from "./src/Pong/PongGameEngine";
-import { setTableSize, getGameState, serverRouter } from "./api";
+import * as getGameState from "./api/getGameState";
+import * as setTableSize from "./api/setTableSize";
+import { serverRouter } from "./api";
 import { NodeWsWebsocketSocket } from "../clients/NodeWsWebsocketSocket";
 
 type Connection = {
