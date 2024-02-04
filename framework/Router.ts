@@ -291,9 +291,9 @@ export class Router {
 			server: method.startsWith("server") ? "client" : "server",
 		} as const;
 
+		const key = self.routeTypes.length;
 		self.routeTypes.push(types);
 
-		const key = self.routeTypes.length;
 		/**
 		 * Define the configuration and types of the route.
 		 *
