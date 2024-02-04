@@ -5,7 +5,7 @@ import { BrowserWebsocketSocket } from "./clients/BrowserWebsocketSocket";
 
 async function example() {
 	// Create router
-	const { route, finalize } = new Router(
+	const router = new Router(
 		// Optional configuration overrides for the router.
 		{
 			// Override the default codec.
@@ -35,13 +35,31 @@ async function example() {
 		},
 	);
 
+	// Declare unique routes.
+	//
+	// This is unwieldy, but it has to be done so that we can efficiently
+	// and stably bind routes to the router.
+	//
+	// As this is a side effect, you must ensure that the declarations are
+	// never removed or reordered unless you are prepared for route with older clients.
+	//
+	// Always append new routes to the end of the list.
+	//
+	// You are recommended to use not give your routes names that have any significance
+	// in order to reduce the meaningfulness of these route declarations.
+	//
+	// To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
+	// Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
+	const route0001 = router.routeClientSend();
+	const route0002 = router.routeClientSendStream();
+	// The connection does not need to be initiated by the client.
+	const route0003 = router.routeServerSendStreamOnly();
+	const route0004 = router.routeClientSendDuplex();
+
 	// Define routes
 	type MultiplySend = { a: number; b: number };
 	type MultiplyRecv = { result: number };
-	const multiplyRoute = route<
-		// To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
-		// Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
-		"client send",
+	const multiplyRoute = route0001.define<
 		// The data that is sent to the server.
 		MultiplySend,
 		// The data that is received from the server.
@@ -50,16 +68,10 @@ async function example() {
 
 	type ToStringSend = { value: number };
 	type ToStringRecv = { result: string };
-	const toStringRoute = route<
-		"client send stream",
-		ToStringSend,
-		ToStringRecv
-	>();
+	const toStringRoute = route0002.define<ToStringSend, ToStringRecv>();
 
 	type TailLogsRecv = { logs: string[] };
-	const tailLogsRoute = route<
-		// The connection does not need to be initiated by the client.
-		"server stream",
+	const tailLogsRoute = route0003.define<
 		// The order of what is sent and what is received changes depending on who initiates the connection.
 		TailLogsRecv,
 		// In a non send stream one side does not send data.
@@ -70,15 +82,10 @@ async function example() {
 
 	type EventStreamSend = { value: string[] };
 	type EventStreamRecv = { value: string[] };
-	const eventStreamRoute = route<
-		"client duplex",
-		EventStreamSend,
-		EventStreamRecv
-	>();
+	const eventStreamRoute = route0004.define<EventStreamSend, EventStreamRecv>();
 
-	// Finalize routes.
-	// You must call finalize after all routes have been defined.
-	const { serverRouter, clientRouter } = finalize();
+	// Extract the router.
+	const { serverRouter, clientRouter } = router;
 
 	// Set up server routes.
 	// Type guard for the multiply route.
@@ -222,8 +229,6 @@ async function example() {
 		});
 
 	// Create and start the server.
-	// Remember the `router` we created earlier from the `finalize` method?
-	// We're gonna need it now.
 
 	// Create a function that will keep the server running.
 	async function createServerWebsocketConnection() {

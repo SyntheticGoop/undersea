@@ -56,7 +56,7 @@ The router is used to register routes and create the bindings for the server and
 ```ts
 import { Router } from "undersea/framework"
 
-export const { route, finalize } = new Router(
+export const router = new Router(
   // Optional configuration overrides for the router.
   {
     // Override the default codec.
@@ -87,6 +87,8 @@ export const { route, finalize } = new Router(
 )
 ```
 
+__Route definition__
+
 You can then define the types of the routes and custom configurations.
 You may move these definitions to a separate file.
 
@@ -98,8 +100,8 @@ The initiating side of the connection will always use `send` routes and the resp
 
 In your route definition you will be asked to define who is initiating the connection.
 ```ts
-router.route<"client ...",  _, _> // The client is initiating the connection.
-router.route<"server ...", _, _> // The server is initiating the connection.
+router.routeClient...() // The client is initiating the connection.
+router.routeServer...() // The server is initiating the connection.
 ```
 
 With these two types of routes there are 4 different variants of routes.
@@ -119,21 +121,39 @@ With these two types of routes there are 4 different variants of routes.
 
 You will make this choice when you're defining the route.
 ```ts
-router.route<"... send", _, _> // `asSend` or `asRecv`
-router.route<"... send stream", _, _> // `asSendStream` or `asRecvStream`
-router.route<"... stream", _, _> // `asSendStreamOnly` or `asRecvStreamOnly`
-router.route<"... duplex", _, _> // `asSendStreamDuplex` or `asRecvStreamDuplex`
+router.route...Send           // `asSend` or `asRecv`
+router.route...SendStream     // `asSendStream` or `asRecvStream`
+router.route...SendStreamOnly // `asSendStreamOnly` or `asRecvStreamOnly`
+router.route...Duplex         // `asSendStreamDuplex` or `asRecvStreamDuplex`
 ```
 
-__Route definition__
 
 ```ts
+// Declare unique routes.
+//
+// This is unwieldy, but it has to be done so that we can efficiently
+// and stably bind routes to the router.
+//
+// As this is a side effect, you must ensure that the declarations are
+// never removed or reordered unless you are prepared for route with older clients.
+//
+// Always append new routes to the end of the list.
+//
+// You are recommended to use not give your routes names that have any significance
+// in order to reduce the meaningfulness of these route declarations.
+//
+// To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
+// Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
+const route0001 = router.routeClientSend();
+const route0002 = router.routeClientSendStream();
+// The connection does not need to be initiated by the client.
+const route0003 = router.routeServerSendStreamOnly();
+const route0004 = router.routeClientSendDuplex();
+
+// Define routes
 type MultiplySend = { a: number; b: number };
 type MultiplyRecv = { result: number };
-const multiplyRoute = route<
-  // To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
-  // Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
-  "client send",
+const multiplyRoute = route0001.define<
   // The data that is sent to the server.
   MultiplySend,
   // The data that is received from the server.
@@ -142,16 +162,10 @@ const multiplyRoute = route<
 
 type ToStringSend = { value: number };
 type ToStringRecv = { result: string };
-const toStringRoute = route<
-  "client send stream",
-  ToStringSend,
-  ToStringRecv
->();
+const toStringRoute = route0002.define<ToStringSend, ToStringRecv>();
 
 type TailLogsRecv = { logs: string[] };
-const tailLogsRoute = route<
-  // The connection does not need to be initiated by the client.
-  "server stream",
+const tailLogsRoute = route0003.define<
   // The order of what is sent and what is received changes depending on who initiates the connection.
   TailLogsRecv,
   // In a non send stream one side does not send data.
@@ -162,44 +176,22 @@ const tailLogsRoute = route<
 
 type EventStreamSend = { value: string[] };
 type EventStreamRecv = { value: string[] };
-const eventStreamRoute = route<
-  "client duplex",
-  EventStreamSend,
-  EventStreamRecv
->();
+const eventStreamRoute = route0004.define<EventStreamSend, EventStreamRecv>();
+
 ```
 
-After defining the routes, you can finalize the router to be used.
+Since creating a route is a side effect that modifies the router the order of
+declaration is important and should remain stable.
 
-If you're using separate files for the route definitions, you must import them
-before finalizing the router.
+Each `.route...()` declaration registers a unique key for the route.
+If you reorder or remove these declarations, you will break the bindings for the router.
+This is okay if you have a way of refreshing all the clients to the new routes.
 
-This is because creating routes is a side effect that modifies the source router.
+Now you can extract the router to be used separately on the server and the client.
 
 ```ts
-// If you're using separate files for the route definitions, you must import them
-// before finalizing the router.
-//
-// This ensures that the routes are always bound in the correct order.
-//
-// This is also why we must create both client and server router constructors in the same file.
-import from "./someApiRoute" 
-
-// Finalize routes.
-// You must call finalize after all routes have been defined.
-const { serverRouter, clientRouter } = finalize();
+const { serverRouter, clientRouter } = router();
 ```
-
-Since creating a route is a side effect that modifies the router, the import
-order is important. 
-
-You should never import directly from the route file. Always re-export your routes
-from the main file where you finalize the router to ensure that routes are always
-bound in the correct order.
-
-The binding of routes generates a unique route key for the route. It is imperative
-that this key is generated the same way on both the server and the client or routes
-will mismatch and you will get data errors.
 
 ### Route action
 
@@ -666,9 +658,9 @@ Or just clone the repository and use it as a local package.
 Note that the framework is located in a subdirectory of the repository.
 You will want to import the files from 
 ```ts
-import from "undersea/framework"
-import from "undersea/clients/*"
-import from "undersea/lib/Socket"
+import {} from "undersea/framework"
+import {} from "undersea/clients/*"
+import {..} from "undersea/lib/Socket"
 ```
 
 Default package exports are a bitch to maintain and I seriously can't be fucked.

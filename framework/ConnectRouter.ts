@@ -20,7 +20,7 @@ export type Context<App, Connection, Socket> = {
 	socket: Socket;
 };
 
-declare class KeyIdentity {
+export declare class KeyIdentity {
 	private declare key: number;
 	private declare identity: symbol;
 }
@@ -104,7 +104,7 @@ export class ConnectRouter<
 	Narrow extends keyof ConnectRouter = "start",
 > {
 	constructor(
-		private readonly serverRouteCount: number,
+		private readonly serverRouteCount: () => number,
 		private readonly serverIdentity: symbol,
 	) {
 		this.start = this.start.bind(this);
@@ -346,10 +346,12 @@ export class ConnectRouter<
 			Context<null, null, Socket>
 	>) &
 		ClientConnectorBrand {
-		if (this.routes.size !== this.serverRouteCount)
+		const currentServerRouteCount = this.serverRouteCount();
+
+		if (this.routes.size !== currentServerRouteCount)
 			throw Error(
 				`You forgot to bind ${
-					this.serverRouteCount - this.routes.size
+					currentServerRouteCount - this.routes.size
 				} route(s)`,
 			);
 
@@ -384,7 +386,7 @@ export class ConnectRouter<
 	 * @returns The connection context.
 	 */
 	private get connect() {
-		return () =>
+		const _connect = () =>
 			this.connection().then(
 				(connection) =>
 					({
@@ -395,12 +397,22 @@ export class ConnectRouter<
 						Context<App, null, Socket> &
 						Context<null, null, Socket>,
 			);
+
+		const connect = _connect as typeof _connect & KeyIdentity;
+
+		// @ts-expect-error We're using private class properties to hide the identity, but it's still available for access.
+		connect.identity = this.serverIdentity;
+
+		return connect;
 	}
 
 	/**
 	 * Create a {@link ConnectRouter} that is set up for late binding.
 	 */
-	public static factory(serverRouteCount: number, serverIdentity: symbol) {
+	public static factory(
+		serverRouteCount: () => number,
+		serverIdentity: symbol,
+	) {
 		const connectRouter = new ConnectRouter<
 			null,
 			null,

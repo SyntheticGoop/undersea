@@ -12,6 +12,7 @@ import {
 	ServerConnectRoute,
 	ClientConnectRoute,
 	ClientConnectorBrand,
+	KeyIdentity,
 } from "./ConnectRouter";
 
 type RouteContext<App, Connection> = Pick<
@@ -46,21 +47,17 @@ export class Route<
 			identity: symbol;
 			key: number;
 		},
-		private readonly updateType: (type: "server" | "client") => void,
 	) {}
 
 	/**
 	 * Create a {@link Router} that is set up for late binding.
 	 */
-	public static factory<ClientRecv, ServerRecv, Type extends string>(
-		context: {
-			codec: Codec;
-			config: Config;
-			identity: symbol;
-			key: number;
-		},
-		updateType: (type: "server" | "client") => void,
-	) {
+	public static factory<ClientRecv, ServerRecv, Type extends string>(context: {
+		codec: Codec;
+		config: Config;
+		identity: symbol;
+		key: number;
+	}) {
 		type AllActions =
 			| "asSend"
 			| "asRecv"
@@ -73,10 +70,7 @@ export class Route<
 
 		type Keys = Exclude<AllActions, Type>;
 
-		const client = new Route<null, null, ClientRecv, ServerRecv, Keys>(
-			context,
-			updateType,
-		);
+		const client = new Route<null, null, ClientRecv, ServerRecv, Keys>(context);
 
 		return client as Omit<typeof client, Keys>;
 	}
@@ -84,10 +78,9 @@ export class Route<
 	/**
 	 * Marks the route as created, preventing overwriting of created routes.
 	 */
-	private once(type: "server" | "client") {
+	private once() {
 		if (this.used) throw new Error("Route already bound");
 
-		this.updateType(type);
 		this.used = true;
 	}
 
@@ -156,7 +149,7 @@ export class Route<
 			send: (data: ServerRecv) => Promise<ClientRecv>;
 		}
 	> {
-		this.once("client");
+		this.once();
 
 		const initiate = new Initiate({
 			...this.context,
@@ -167,8 +160,15 @@ export class Route<
 		return brandConnectRoute({
 			connect(
 				context: (() => Promise<Context<App, Connection, Socket>>) &
-					ClientConnectorBrand,
+					ClientConnectorBrand &
+					KeyIdentity,
 			) {
+				// @ts-expect-error: We know the identity exists.
+				if (this.identity !== context.identity)
+					throw Error(
+						"Route was not created on the same router as the client.",
+					);
+
 				const route = initiate.start(context);
 				/**
 				 * Sends input and receives output.
@@ -224,7 +224,7 @@ export class Route<
 		) => Promise<ClientRecv>,
 		schema?: (data: unknown) => data is ServerRecv,
 	): ServerConnectRoute<App, Connection> {
-		this.once("server");
+		this.once();
 
 		const endpoint = new Endpoint({
 			...this.context,
@@ -287,7 +287,7 @@ export class Route<
 			send: (data: ServerRecv) => Promise<ClientRecv>;
 		}
 	> {
-		this.once("client");
+		this.once();
 
 		const initiate = new Initiate({
 			...this.context,
@@ -304,8 +304,14 @@ export class Route<
 		return brandConnectRoute({
 			connect(
 				context: (() => Promise<Context<App, Connection, Socket>>) &
-					ClientConnectorBrand,
+					ClientConnectorBrand &
+					KeyIdentity,
 			) {
+				// @ts-expect-error: We know the identity exists.
+				if (this.identity !== context.identity)
+					throw Error(
+						"Route was not created on the same router as the client.",
+					);
 				const connection = initiate.start(context);
 
 				const query = connection.then((service) => {
@@ -387,7 +393,7 @@ export class Route<
 		buffer: number,
 		schema?: (data: unknown) => data is ServerRecv,
 	): ServerConnectRoute<App, Connection> {
-		this.once("server");
+		this.once();
 
 		const endpoint = new Endpoint({
 			...this.context,
@@ -461,7 +467,7 @@ export class Route<
 			send(data: ServerRecv): Promise<boolean>;
 		}
 	> {
-		this.once("client");
+		this.once();
 
 		const initiate = new Initiate({
 			...this.context,
@@ -478,8 +484,14 @@ export class Route<
 			 */
 			connect(
 				context: (() => Promise<Context<App, Connection, Socket>>) &
-					ClientConnectorBrand,
+					ClientConnectorBrand &
+					KeyIdentity,
 			) {
+				// @ts-expect-error: We know the identity exists.
+				if (this.identity !== context.identity)
+					throw Error(
+						"Route was not created on the same router as the client.",
+					);
 				const connection = initiate.start(context);
 
 				/**
@@ -539,7 +551,7 @@ export class Route<
 		buffer: number,
 		schema?: (data: unknown) => data is ServerRecv,
 	): ServerConnectRoute<App, Connection> {
-		this.once("server");
+		this.once();
 
 		const endpoint = new Endpoint({
 			...this.context,
@@ -628,15 +640,21 @@ export class Route<
 			send(data: ServerRecv): boolean;
 		}
 	> {
-		this.once("client");
+		this.once();
 
 		const appContext = this.context;
 
 		return brandConnectRoute({
 			connect(
 				context: (() => Promise<Context<App, Connection, Socket>>) &
-					ClientConnectorBrand,
+					ClientConnectorBrand &
+					KeyIdentity,
 			) {
+				// @ts-expect-error: We know the identity exists.
+				if (this.identity !== context.identity)
+					throw Error(
+						"Route was not created on the same router as the client.",
+					);
 				let loadInternal: (payload: ServerRecv) => boolean = () => false;
 
 				async function recv(
@@ -767,7 +785,7 @@ export class Route<
 		},
 		schema?: (data: unknown) => data is ServerRecv,
 	): ServerConnectRoute<App, Connection> {
-		this.once("server");
+		this.once();
 
 		const initiate = new Endpoint({
 			...this.context,
