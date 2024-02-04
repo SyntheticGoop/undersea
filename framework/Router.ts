@@ -1,12 +1,12 @@
-import { Socket } from "../lib/Socket";
 import { Config } from "./Config";
 import { Codec } from "./Codec";
 import { Route } from "./Route";
+import { ConnectRouter } from "./ConnectRouter";
 
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: Config = {
 	ackDeadline: 5000,
-	channelSilentDeadline: 30000,
-	connectSilentDeadline: 30000,
+	clientSilentDeadline: 30000,
+	serverSilentDeadline: 30000,
 };
 
 const DEFAULT_CODEC = {
@@ -23,50 +23,89 @@ const DEFAULT_CODEC = {
 	},
 };
 
-export class Router<
-	ServerApp = null,
-	ClientApp = null,
-	ServerConnection = null,
-	ClientConnection = null,
-> {
+/**
+ * The main router for undersea. Start here.
+ *
+ * # Example
+ *
+ * ```ts
+ * const { route, finalize } = new Router();
+ *
+ * const isEvenRoute = route<"client send", { val: number }, { isEven: boolean }>();
+ *
+ * const { serverRouter, clientRouter } = finalize();
+ *
+ * const isEvenServer = isEvenRoute.server.asRecv(({ val }) => ({ isEven: val % 2 === 0 }));
+ * const isEvenClient = isEvenRoute.client.asSend();
+ *
+ * serverRouter()
+ *   .withConnection(
+ *     async () => ({
+ * 		  socket: { Socket interface },
+ *     })
+ *   )
+ *   .withRoutes(
+ *     isEvenServer
+ *   )
+ *   .start();
+ *
+ * const client = clientRouter()
+ *   .withConnection(
+ *     async () => ({
+ * 		  socket: { Socket interface },
+ *     })
+ *   )
+ *   .start()
+ *
+ * const instance = isEvenClient.connect(client);
+ *
+ * expect(instance.send({ val: 2 })).resolves.toEqual({ isEven: true });
+ * ```
+ */
+export class Router {
 	private readonly context: {
 		codec: Codec;
 		config: Config;
 	};
 
-	constructor(context?: { codec?: Partial<Codec>; config?: Partial<Config> }) {
+	private readonly identity = Symbol("Router");
+
+	/**
+	 * Override default router options.
+	 *
+	 * @param override Override router options.
+	 */
+	constructor(override?: {
+		/**
+		 * Override the default codec.
+		 *
+		 * The default codec converts the object to JSON and then represents it as a UTF-8 ArrayBuffer.
+		 */
+		codec?: Partial<Codec>;
+		/**
+		 * Override the default config.
+		 *
+		 * Times in milliseconds.
+		 *
+		 * Default config:
+		 * - `ackDeadline`: 5000
+		 * - `clientSilentDeadline`: 30000
+		 * - `serverSilentDeadline`: 30000
+		 */
+		config?: Partial<Config>;
+	}) {
 		this.context = {
-			codec: { ...DEFAULT_CODEC, ...context?.codec },
-			config: { ...DEFAULT_CONFIG, ...context?.config },
+			codec: { ...DEFAULT_CODEC, ...override?.codec },
+			config: { ...DEFAULT_CONFIG, ...override?.config },
 		};
 
 		this.route = this.route.bind(this);
 		this.finalize = this.finalize.bind(this);
 	}
 
-	/**
-	 * Holds all the routes that have been registered.
-	 *
-	 * Allows us to index the routes with stable keys.
-	 */
-	private readonly routes: Array<{
-		server: Route<
-			ServerApp,
-			ServerConnection,
-			// biome-ignore lint/suspicious/noExplicitAny: The stored value here is never actually used
-			any,
-			// biome-ignore lint/suspicious/noExplicitAny: The stored value here is never actually used
-			any
-		>;
-		client: Route<
-			ClientApp,
-			ClientConnection,
-			// biome-ignore lint/suspicious/noExplicitAny: The stored value here is never actually used
-			any,
-			// biome-ignore lint/suspicious/noExplicitAny: The stored value here is never actually used
-			any
-		>;
-	}> = [];
+	private routeTypes: Array<
+		Record<"client" | "server", "client" | "server" | "unknown">
+	> = [];
 
 	private finalized = false;
 
@@ -79,131 +118,181 @@ export class Router<
 	 * - "stream": A continuous stream of data in one direction only.
 	 * - "duplex": A continuous stream of data in both directions.
 	 *
+	 * # Example
+	 * ```ts
+	 * const actionA = route<"client send", { val: number }, { isEven: boolean }>();
+	 * const clientActionA = actionA.client.asSend();
+	 * const serverActionA = actionA.server.asRecv(...);
+	 *
+	 * const actionB = route<"server send stream", { send: string }, { recv: string }>();
+	 * const clientActionB = actionB.server.asSendStream(...);
+	 * const serverActionB = actionB.client.asRecvStream(...);
+	 * ```
+	 *
 	 * @param type Route type. One of "query", "query stream", "stream", "duplex".
 	 * @param config Route configuration.
 	 */
 	public route<
-		Source extends "server" | "client",
-		Type extends "send" | "send stream" | "stream" | "duplex",
+		Kind extends `${"server" | "client"} ${
+			| "send"
+			| "send stream"
+			| "stream"
+			| "duplex"}`,
 		ServerRecv,
 		ClientRecv,
-	>(config?: Config) {
+	>(config?: Partial<Config>) {
 		if (this.finalized) {
-			throw new Error("Router has been finalized");
+			throw Error("Router has been finalized");
 		}
 
-		const server = new Route<
-			ServerApp,
-			ServerConnection,
-			ClientRecv,
-			ServerRecv
-		>({
-			codec: this.context.codec,
-			config: { ...this.context.config, ...config },
-			key: this.routes.length,
-		});
+		const types = {
+			client: "unknown" as "client" | "server" | "unknown",
+			server: "unknown" as "client" | "server" | "unknown",
+		};
 
-		const client = new Route<
-			ClientApp,
-			ClientConnection,
-			ClientRecv,
-			ServerRecv
-		>({
-			codec: this.context.codec,
-			config: { ...this.context.config, ...config },
-			key: this.routes.length,
-		});
+		this.routeTypes.push(types);
 
-		this.routes.push({ server, client });
+		const key = this.routeTypes.length;
+
+		if (key > 0xff_ff) {
+			throw Error("Too many routes");
+		}
+
+		const server = Route.factory<
+			ClientRecv,
+			ServerRecv,
+			Kind extends `server ${infer Type}`
+				? Type extends "send"
+					? "asSend"
+					: Type extends "send stream"
+					  ? "asSendStream"
+					  : Type extends "stream"
+						  ? "asSendStreamOnly"
+						  : Type extends "duplex"
+							  ? "asSendDuplex"
+							  : never
+				: Kind extends `client ${infer Type}`
+				  ? Type extends "send"
+						? "asRecv"
+						: Type extends "send stream"
+						  ? "asRecvStream"
+						  : Type extends "stream"
+							  ? "asRecvStreamOnly"
+							  : Type extends "duplex"
+								  ? "asRecvDuplex"
+								  : never
+				  : never
+		>(
+			{
+				codec: this.context.codec,
+				config: { ...this.context.config, ...config },
+				identity: this.identity,
+				key,
+			},
+			(type) => {
+				types.server = type;
+			},
+		);
+
+		const client = Route.factory<
+			ClientRecv,
+			ServerRecv,
+			Kind extends `client ${infer Type}`
+				? Type extends "send"
+					? "asSend"
+					: Type extends "send stream"
+					  ? "asSendStream"
+					  : Type extends "stream"
+						  ? "asSendStreamOnly"
+						  : Type extends "duplex"
+							  ? "asSendDuplex"
+							  : never
+				: Kind extends `server ${infer Type}`
+				  ? Type extends "send"
+						? "asRecv"
+						: Type extends "send stream"
+						  ? "asRecvStream"
+						  : Type extends "stream"
+							  ? "asRecvStreamOnly"
+							  : Type extends "duplex"
+								  ? "asRecvDuplex"
+								  : never
+				  : never
+		>(
+			{
+				codec: this.context.codec,
+				config: { ...this.context.config, ...config },
+				identity: this.identity,
+				key,
+			},
+			(type) => {
+				types.server = type;
+			},
+		);
 
 		return {
-			server: server as Pick<
-				typeof server,
-				Source extends "server"
-					? Type extends "send"
-						? "asSend"
-						: Type extends "send stream"
-						  ? "asSendStream"
-						  : Type extends "stream"
-							  ? "asSendStreamOnly"
-							  : Type extends "duplex"
-								  ? "asSendDuplex"
-								  : never
-					: Type extends "send"
-					  ? "asRecv"
-					  : Type extends "send stream"
-						  ? "asRecvStream"
-						  : Type extends "stream"
-							  ? "asRecvStreamOnly"
-							  : Type extends "duplex"
-								  ? "asRecvDuplex"
-								  : never
-			>,
-			client: client as Pick<
-				typeof client,
-				Source extends "client"
-					? Type extends "send"
-						? "asSend"
-						: Type extends "send stream"
-						  ? "asSendStream"
-						  : Type extends "stream"
-							  ? "asSendStreamOnly"
-							  : Type extends "duplex"
-								  ? "asSendDuplex"
-								  : never
-					: Type extends "send"
-					  ? "asRecv"
-					  : Type extends "send stream"
-						  ? "asRecvStream"
-						  : Type extends "stream"
-							  ? "asRecvStreamOnly"
-							  : Type extends "duplex"
-								  ? "asRecvDuplex"
-								  : never
-			>,
+			/**
+			 * The server route creator. Use this to define the server side of the route.
+			 */
+			server,
+			/**
+			 * The client route creator. Use this to define the client side of the route.
+			 */
+			client,
 		};
 	}
 
 	/**
-	 * Create client and server context bindings.
+	 * Stop further route registration and return the router.
 	 *
-	 * You should only need to call this once.
+	 * The generated router may be used multiple times in different connections.
 	 *
-	 * Never make any more routes after calling this method.
+	 * # Example
+	 *
+	 * ```ts
+	 * // ... Ensure you import all your routes before finalizing the router.
+	 *
+	 * const { serverRouter, clientRouter } = finalize();
+	 *
+	 * const server = serverRouter()
+	 *   .withApp(...)
+	 *   .withConnection(...)
+	 *   .withRoutes(...)
+	 *   .start();
+	 *
+	 * serverAction(server).send(...);
+	 *
+	 * const client = clientRouter()
+	 *   .withApp(...)
+	 *   .withConnection(...)
+	 *   .withRoutes(...)
+	 *   .start();
+	 *
+	 * clientAction(client).send(...);
+	 * ```
+	 *
+	 * @returns A router that needs bindings to the application context and connections.
 	 */
 	public finalize() {
 		this.finalized = true;
 
 		return {
-			bindClient(
-				app: ClientApp,
-				connect: () => Promise<{
-					socket: Socket;
-					connection: ClientConnection;
-				}>,
-			) {
-				return () =>
-					connect().then(({ socket, connection }) => ({
-						app,
-						connection,
-						socket,
-					}));
-			},
-
-			bindServer(
-				app: ServerApp,
-				connect: () => Promise<{
-					socket: Socket;
-					connection: ServerConnection;
-				}>,
-			) {
-				return () =>
-					connect().then(({ socket, connection }) => ({
-						app,
-						connection,
-						socket,
-					}));
-			},
+			/**
+			 * A server router factory.
+			 */
+			serverRouter: () =>
+				ConnectRouter.factory(
+					this.routeTypes.filter((type) => type.server === "server").length,
+					this.identity,
+				),
+			/**
+			 * A client router factory.
+			 */
+			clientRouter: () =>
+				ConnectRouter.factory(
+					this.routeTypes.filter((type) => type.client === "server").length,
+					this.identity,
+				),
 		};
 	}
 }

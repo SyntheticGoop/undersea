@@ -22,7 +22,7 @@ export class Initiate<
 	constructor(
 		private readonly context: {
 			codec: Codec;
-			config: Pick<Config, "ackDeadline" | "connectSilentDeadline">;
+			config: Pick<Config, "ackDeadline" | "serverSilentDeadline">;
 			key: number;
 			createService(context: {
 				app: App;
@@ -63,7 +63,7 @@ export class Initiate<
 				},
 				task,
 				this.context.config.ackDeadline,
-				this.context.config.connectSilentDeadline,
+				this.context.config.serverSilentDeadline,
 				service.internal,
 				service.external,
 			);

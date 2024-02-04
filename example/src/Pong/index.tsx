@@ -2,8 +2,8 @@ import { Ball } from "./Ball";
 import { Paddle } from "./Paddle";
 import { createSignal, onMount } from "solid-js";
 import { PositionControl } from "./PositionControl";
-import { BrowserWsWebsocketSocket } from "../../../undersea/clients/BrowserWesocketSocket";
-import { bindClient } from "../../api";
+import {BrowserWebsocketSocket} from "../../../clients/BrowserWebsocketSocket"
+import { clientRouter  } from "../../api";
 import { setTableSize, getGameState } from "../../api";
 
 const getGameStateHandler = getGameState.client.asSendStream(10);
@@ -17,9 +17,9 @@ export function Pong() {
 
 	const websocket = new WebSocket(`ws://${location.host}/ws`);
 
-	const socket = new BrowserWsWebsocketSocket(websocket, { in: 100, out: 100 });
+	const socket = new BrowserWebsocketSocket(websocket, { in: 100, out: 100 });
 
-	const client = bindClient(null, async () => {
+	const client = clientRouter().withConnection(async () => {
 		new Promise<void>((ok) => {
 			if (websocket.readyState === websocket.CLOSED) return ok();
 			websocket.addEventListener("close", ok);
@@ -28,7 +28,7 @@ export function Pong() {
 			connection: null,
 			socket: socket.multiplex(),
 		};
-	});
+	}).start();
 
 	onMount(() => {
 		// const engine = new PongGameEngine();
@@ -42,28 +42,26 @@ export function Pong() {
 		p2.setDelta(rect.x, rect.y);
 		ball.setDelta(rect.x, rect.y);
 
-		const engine = getGameStateHandler.start(client);
-		const updateSize = setTableSizeHandler.start(client);
+		const engine = getGameStateHandler.connect(client);
+		const updateSize = setTableSizeHandler.connect(client);
 
 		async function advance() {
 			const rect = boardRef()!.getBoundingClientRect();
 
 			while (true) {
-				if (await updateSize({ width: rect.width, height: rect.height })) break;
+				try {
+				if (await updateSize.send({ width: rect.width, height: rect.height })) break;
+				} catch {
 				await new Promise((ok) => setTimeout(ok, 1));
+				}
 			}
 
 			while (true) {
-				const data = await engine({ time: Date.now() });
-				if (data === false) {
-					await new Promise((ok) => setTimeout(ok, 1));
-					continue;
-				}
+				try {
+				const data = await engine.send({ time: Date.now() });
 
 				console.log("update", data);
-				// engine.advanceGame();
 
-				// engine.setTableSize(rect.width, rect.height);
 
 				p1.y = data.player1.y;
 				p1.x = data.player1.x;
@@ -73,6 +71,10 @@ export function Pong() {
 
 				ball.y = data.ball.y;
 				ball.x = data.ball.x;
+				} catch  {
+					await new Promise((ok) => setTimeout(ok, 1));
+					continue;
+				}
 				// await new Promise((ok) => setTimeout(ok, 1000));
 				break;
 			}

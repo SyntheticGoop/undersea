@@ -5,8 +5,7 @@ export type TableSize = {
 	height: number;
 };
 export const { client, server } = router.route<
-	"client",
-	"stream",
+	"client stream",
 	TableSize,
 	null
 >();

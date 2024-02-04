@@ -18,8 +18,7 @@ export type GameState = {
 	};
 };
 export const { client, server } = router.route<
-	"client",
-	"send stream",
+	"client send stream",
 	GameTick,
 	GameState
 >();

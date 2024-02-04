@@ -37,7 +37,7 @@ describe("Initiate-Endpoint", async () => {
 	const endpoint = new Endpoint({
 		config: {
 			ackDeadline: 10,
-			channelSilentDeadline: 100,
+			clientSilentDeadline: 100,
 		},
 		codec,
 		key,
@@ -69,7 +69,7 @@ describe("Initiate-Endpoint", async () => {
 	const initiate = new Initiate({
 		config: {
 			ackDeadline: 10,
-			connectSilentDeadline: 100,
+			serverSilentDeadline: 100,
 		},
 		codec,
 		key,

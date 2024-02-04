@@ -1,7 +1,7 @@
 {
   "license": "GPL-3.0",
   "name": "undersea",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Typed streaming api engine",
   "scripts": {
     "test": "vitest"

@@ -2,6 +2,12 @@ import { Socket } from "../lib/Socket";
 import { CircularBuffer } from "../lib/CircularBuffer";
 import { ConnectableCircularBuffer } from "../lib/ConnectableCircularBuffer";
 
+/**
+ * A virtual socket that can be used for testing or to derive other sockets for.
+ *
+ * The virtual socket maintains a buffer for incoming and outgoing data and
+ * can share that incoming buffer across multiplexed connections.
+ */
 export class VirtualSocket implements Socket {
 	public readonly outBuffer: ConnectableCircularBuffer<ArrayBuffer>;
 	private inBufferShared: Set<CircularBuffer<ArrayBuffer>>;

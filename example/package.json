@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "dev:client": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
     "dev:server": "vite-node ./server.ts"
   },
   "dependencies": {

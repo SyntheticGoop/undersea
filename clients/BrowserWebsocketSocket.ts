@@ -1,5 +1,8 @@
 import { VirtualSocket } from "./VirtualSocket";
 
+/**
+ * A native browser websocket `Socket` implementation based on {@link VirtualSocket}.
+ */
 export class BrowserWebsocketSocket extends VirtualSocket {
 	constructor(
 		private readonly socket: WebSocket,

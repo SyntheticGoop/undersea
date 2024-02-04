@@ -23,7 +23,14 @@ export function mapServiceHandler<
 
 				return;
 			}
-			const data = codec.decode(rawData.value);
+			let data: unknown;
+			// Try to decode the data, if it fails, we should ignore it.
+			try {
+				data = codec.decode(rawData.value);
+			} catch (error) {
+				console.error(error);
+				return;
+			}
 			if (!service.validate(data)) {
 				// TODO: gracefully handle error
 

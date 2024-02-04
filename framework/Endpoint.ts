@@ -16,7 +16,7 @@ export class Endpoint<
 	constructor(
 		private readonly context: {
 			codec: Codec;
-			config: Pick<Config, "ackDeadline" | "channelSilentDeadline">;
+			config: Pick<Config, "ackDeadline" | "clientSilentDeadline">;
 			key: number;
 			createService(context: {
 				app: App;
@@ -49,7 +49,7 @@ export class Endpoint<
 				},
 				task,
 				this.context.config.ackDeadline,
-				this.context.config.channelSilentDeadline,
+				this.context.config.clientSilentDeadline,
 				() => {
 					const serviceHandler = mapServiceHandler(
 						this.context.codec,

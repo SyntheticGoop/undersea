@@ -1,7 +1,10 @@
-import { WebSocket } from "ws";
+import { type WebSocket } from "ws";
 
 import { VirtualSocket } from "./VirtualSocket";
 
+/**
+ * A `ws` node websocket `Socket` implementation based on {@link VirtualSocket}.
+ */
 export class NodeWsWebsocketSocket extends VirtualSocket {
 	constructor(
 		private readonly socket: WebSocket,
@@ -29,7 +32,7 @@ export class NodeWsWebsocketSocket extends VirtualSocket {
 			}
 		});
 
-		if (this.socket.readyState === WebSocket.OPEN) {
+		if (this.socket.readyState === this.socket.OPEN) {
 			this.bindSend();
 		}
 
@@ -45,20 +48,20 @@ export class NodeWsWebsocketSocket extends VirtualSocket {
 
 		this.outBuffer.connectPush((bytes) => {
 			switch (this.socket.readyState) {
-				case WebSocket.OPEN:
+				case this.socket.OPEN:
 					this.socket.send(bytes);
 					break;
 
-				case WebSocket.CONNECTING:
+				case this.socket.CONNECTING:
 					console.warn(
 						"Websocket cannot be connecting if callback is bound on open",
 					);
 					break;
-				case WebSocket.CLOSING:
+				case this.socket.CLOSING:
 					console.warn("Cannot send data while closing");
 					break;
 
-				case WebSocket.CLOSED:
+				case this.socket.CLOSED:
 					console.warn("Cannot send data while closed");
 					break;
 			}

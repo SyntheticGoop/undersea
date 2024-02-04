@@ -1,28 +1,36 @@
 import { WebSocketServer } from "ws";
-import { NodeWsWebsocketSocket } from "../undersea/clients/NodeWsWebsocketSocket";
 import { PongGameEngine } from "./src/Pong/PongGameEngine";
-import { setTableSize, getGameState, bindServer } from "./api";
+import { setTableSize, getGameState, serverRouter } from "./api";
+import { NodeWsWebsocketSocket } from "../clients/NodeWsWebsocketSocket";
 
-const getGameStateHandle = getGameState.server.asRecvStream(
-	() =>
-		async (data, { connection: { engine } }) => {
-			engine.advanceGame(data.time);
+type Connection = {
+	engine: PongGameEngine;
+};
 
-			return engine.data;
+const getGameStateHandle = getGameState.server
+	.withConnection<Connection>()
+	.asRecvStream(
+		() =>
+			async (data, { connection: { engine } }) => {
+				engine.advanceGame(data.time);
+
+				return engine.data;
+			},
+		10,
+		(data): data is getGameState.GameTick => true,
+	);
+
+const setTableSizeHandle = setTableSize.server
+	.withConnection<Connection>()
+	.asRecvStreamOnly(
+		() => {
+			return async (data, { connection: { engine } }) => {
+				engine.setTableSize(data.width, data.height);
+			};
 		},
-	10,
-	(data): data is getGameState.GameTick => true,
-);
-
-const setTableSizeHandle = setTableSize.server.asRecvStreamOnly(
-	() => {
-		return async (data, { connection: { engine } }) => {
-			engine.setTableSize(data.width, data.height);
-		};
-	},
-	50,
-	(data): data is setTableSize.TableSize => true,
-);
+		50,
+		(data): data is setTableSize.TableSize => true,
+	);
 
 async function createServerWebsocketConnection() {
 	while (true) {
@@ -40,13 +48,13 @@ async function createServerWebsocketConnection() {
 
 			const engine = new PongGameEngine();
 
-			const server = bindServer(null, async () => ({
-				connection: { engine },
-				socket,
-			}));
-
-			getGameStateHandle(server);
-			setTableSizeHandle(server);
+			const server = serverRouter()
+				.withConnection(async () => ({
+					connection: { engine },
+					socket,
+				}))
+				.withRoutes(getGameStateHandle, setTableSizeHandle)
+				.start();
 		});
 
 		await new Promise((ok) => {

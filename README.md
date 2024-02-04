@@ -5,18 +5,18 @@
   - [Why not \[insert other framework here\]?](#why-not-insert-other-framework-here)
   - [Why did you make this then?](#why-did-you-make-this-then)
   - [Example usage](#example-usage)
-        - [Shared API definition](#shared-api-definition)
-        - [Route action](#route-action)
-        - [Using the route](#using-the-route)
-        - [Error handling](#error-handling)
-        - [Testing](#testing)
-        - [Security](#security)
-        - [Reliability](#reliability)
-        - [Performance](#performance)
+    - [Shared API definition](#shared-api-definition)
+    - [Route action](#route-action)
+    - [Using the route](#using-the-route)
+    - [Error handling](#error-handling)
+    - [Testing](#testing)
+    - [Security](#security)
+    - [Reliability](#reliability)
+    - [Performance](#performance)
   - [Okay I still want to use this. How do I install it?](#okay-i-still-want-to-use-this-how-do-i-install-it)
-        - [Warning on bundling](#warning-on-bundling)
-        - [Using with frameworks like `nextjs`](#using-with-frameworks-like-nextjs)
-        - [A note on versioning](#a-note-on-versioning)
+    - [Warning on bundling](#warning-on-bundling)
+    - [Using with frameworks like `nextjs`](#using-with-frameworks-like-nextjs)
+    - [A note on versioning](#a-note-on-versioning)
   - [Technical dive behind the design](#technical-dive-behind-the-design)
 
 # Undersea
@@ -45,29 +45,43 @@ Partly as an experiment, but also because I dislike how other frameworks operate
 
 ## Example usage
 
-##### Shared API definition
+This example is kept in sync with [example.ts](./example.ts).
+
+### Shared API definition
+
+To start with, you must create a router.
+
+The router is used to register routes and create the bindings for the server and the client.
+
 ```ts
 import { Router } from "undersea/framework"
 
-export type ServerState; // State shared on the entire server (e.g. database connection pool)
-export type ClientState; // State shared on the entire client (e.g. user session)
-
-export type ServerConnectionState; // State shared within a connection (e.g. user session)
-export type ClientConnectionState; // State shared within a connection (e.g. server session)
-
-export const { route, finalize } = new Router<ServerState, ClientState, ServerConnectionState, ClientConnectionState>(
+export const { route, finalize } = new Router(
   // Optional configuration overrides for the router.
   {
-    // Encoding and decoding options. Uses binary representation of JSON by default.
+    // Override the default codec.
+    //
+    // The default codec converts the object to JSON and then represents it as a UTF-8 ArrayBuffer.
     codec: {
-      encode: (data: unknown) => ArrayBuffer, // Encode the data to send on the wire
-      decode: (data: ArrayBuffer) => unknown, // Decode the data received from the wire
+      // Encode the data into an ArrayBuffer.
+      //
+      // You must return an ArrayBuffer.
+      encode: (data: unknown) => new TextEncoder().encode(JSON.stringify(data)).buffer,
+      // Decode the data from an ArrayBuffer.
+      //
+      // It is acceptable to throw an error if the data is invalid.
+      decode: (data: ArrayBuffer) => JSON.parse(new TextDecoder().decode(data)),
     },
-    // Connection options. These options may also be modified on the route itself during creation.
+    // Override the default config.
+    //
+    // Times in milliseconds.
     config: {
-      ackDeadline: 5000, // Change how long the server waits for a message ack.
-      channelSilentDeadline: 10000, // Change the maximum time between messages from the client before the server considers the connection dead.
-      connectSilentDeadline: 10000, // Change the maximum time between messages from the server before the client considers the connection dead.
+      // The maximum time to wait for an ack before disconnecting.
+      ackDeadline: 5000, 
+      // The maximum time to wait for a response on the server before disconnecting.
+      channelSilentDeadline: 30000, 
+      // The maximum time to wait for a message on the client before disconnecting.
+      connectSilentDeadline: 30000, 
     }
   }
 )
@@ -75,55 +89,6 @@ export const { route, finalize } = new Router<ServerState, ClientState, ServerCo
 
 You can then define the types of the routes and custom configurations.
 You may move these definitions to a separate file.
-
-However, you must import them back before finalizing the router. 
-
-```ts
-export type DataServerReceives; // The data the server receives from the client.
-export type DataClientReceives; // The data the client receives from the server.
-
-export const { client, server } = route<
-  "client", // To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
-  "send", // Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
-  DataServerReceives,
-  DataClientReceives
->(
-  // This is optional. It will inherit the configuration from the router if not provided.
-  {
-    ackDeadline: 5000, // Change how long the server waits for a message ack.
-    channelSilentDeadline: 10000, // Change the maximum time between messages from the client before the server considers the connection dead.
-    connectSilentDeadline: 10000, // Change the maximum time between messages from the server before the client considers the connection dead.
-  }
-)
-```
-
-After defining the route, you can finalize the router to be used.
-
-If you're using separate files for the route definitions, you must import them
-before finalizing the router.
-
-```ts
-import { finalize } from "./api"
-export * as someApiRoute from "./someApiRoute"
-export const { bindServer, bindClient } = finalize()
-```
-
-Since creating a route is a side effect that modifies the router, the import
-order is important. 
-
-You should never import directly from the route file. Always re-export your routes
-from the main file where you finalize the router to ensure that routes are always
-bound in the correct order.
-
-The binding of routes generates a unique route key for the route. It is imperative
-that this key is generated the same way on both the server and the client or routes
-will mismatch and you will get data errors.
-
-##### Route action
-
-Once your api is defined, you must define the handlers for the server and the client.
-
-Which handlers you can pick depends on your route definition.
 
 There are two types of routes `recv` and `send` routes.
 The `recv` are where the server actions are defined.
@@ -133,8 +98,8 @@ The initiating side of the connection will always use `send` routes and the resp
 
 In your route definition you will be asked to define who is initiating the connection.
 ```ts
-router.route<"client", _, _, _> // The client is initiating the connection.
-router.route<"server", _, _, _> // The server is initiating the connection.
+router.route<"client ...",  _, _> // The client is initiating the connection.
+router.route<"server ...", _, _> // The server is initiating the connection.
 ```
 
 With these two types of routes there are 4 different variants of routes.
@@ -154,11 +119,93 @@ With these two types of routes there are 4 different variants of routes.
 
 You will make this choice when you're defining the route.
 ```ts
-router.route<_, "send", _, _> // `asSend` or `asRecv`
-router.route<_, "send stream", _, _> // `asSendStream` or `asRecvStream`
-router.route<_, "stream", _, _> // `asSendStreamOnly` or `asRecvStreamOnly`
-router.route<_, "duplex", _, _> // `asSendStreamDuplex` or `asRecvStreamDuplex`
+router.route<"... send", _, _> // `asSend` or `asRecv`
+router.route<"... send stream", _, _> // `asSendStream` or `asRecvStream`
+router.route<"... stream", _, _> // `asSendStreamOnly` or `asRecvStreamOnly`
+router.route<"... duplex", _, _> // `asSendStreamDuplex` or `asRecvStreamDuplex`
 ```
+
+__Route definition__
+
+```ts
+type MultiplySend = { a: number; b: number };
+type MultiplyRecv = { result: number };
+const multiplyRoute = route<
+  // To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
+  // Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
+  "client send",
+  // The data that is sent to the server.
+  MultiplySend,
+  // The data that is received from the server.
+  MultiplyRecv
+>();
+
+type ToStringSend = { value: number };
+type ToStringRecv = { result: string };
+const toStringRoute = route<
+  "client send stream",
+  ToStringSend,
+  ToStringRecv
+>();
+
+type TailLogsRecv = { logs: string[] };
+const tailLogsRoute = route<
+  // The connection does not need to be initiated by the client.
+  "server stream",
+  // The order of what is sent and what is received changes depending on who initiates the connection.
+  TailLogsRecv,
+  // In a non send stream one side does not send data.
+  null
+>({
+  serverSilentDeadline: Number.POSITIVE_INFINITY,
+});
+
+type EventStreamSend = { value: string[] };
+type EventStreamRecv = { value: string[] };
+const eventStreamRoute = route<
+  "client duplex",
+  EventStreamSend,
+  EventStreamRecv
+>();
+```
+
+After defining the routes, you can finalize the router to be used.
+
+If you're using separate files for the route definitions, you must import them
+before finalizing the router.
+
+This is because creating routes is a side effect that modifies the source router.
+
+```ts
+// If you're using separate files for the route definitions, you must import them
+// before finalizing the router.
+//
+// This ensures that the routes are always bound in the correct order.
+//
+// This is also why we must create both client and server router constructors in the same file.
+import from "./someApiRoute" 
+
+// Finalize routes.
+// You must call finalize after all routes have been defined.
+const { serverRouter, clientRouter } = finalize();
+```
+
+Since creating a route is a side effect that modifies the router, the import
+order is important. 
+
+You should never import directly from the route file. Always re-export your routes
+from the main file where you finalize the router to ensure that routes are always
+bound in the correct order.
+
+The binding of routes generates a unique route key for the route. It is imperative
+that this key is generated the same way on both the server and the client or routes
+will mismatch and you will get data errors.
+
+### Route action
+
+Once your api is defined, you must define the handlers for the server and the client.
+
+Which handlers you can pick depends on your route definition.
 
 You may write a validation function for the responses to all routes as you may not want to trust the other side of the connection. The exception to this is the `asSendStreamOnly` as it never receives a response.
 
@@ -174,49 +221,123 @@ Be judicious with your buffer sizes as having large buffers will cost more memor
 
 __On the server__
 ```ts
-import { someApiRoute } from "./api"
-
-function validator(data: unknown): data is someApiRoute.DataServerReceives {
-  // Your validation logic here
-  return true
+// Type guard for the multiply route.
+function validateMultiplySend(data: unknown): data is MultiplySend {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "a" in data &&
+    "b" in data &&
+    typeof data.a === "number" &&
+    typeof data.b === "number"
+  );
 }
 
-export const apiRoute = someApiRoute.server.asRecv(
+const serverMultiplyRoute = multiplyRoute.server.asRecv(
+  // The action to take when the route is called.
+  async (data) => ({ result: data.a * data.b }),
+  // Validate the data sent to the server.
+  //
+  // This is optional, but you probably want to do this if your route is on the server.
+  // It's probably fine to omit this on the client.
+  validateMultiplySend,
+);
+
+const serverToStringRoute = toStringRoute.server.asRecvStream(
+  // The action to take when the route is called.
+  //
+  // Stream routes are intended to be spawned repeatedly, therefore you must
+  // return a factory function to create a new handler for each time the route
+  // is called.
+  //
+  // It is completely valid for a connection to make multiple connection attempts.
+  //
+  // The handlers can have closures over the state generated inside the factory function.
+  // This is useful for when managing state of long lived streams.
   () => {
-    // Server routes are intended to be spawned repeatedly, therefore you must
-    // return a factory function to create a new handler for each time the route
-    // is called.
-
-    // It is completely valid for a connection to make multiple connection attempts.
-
-    // The handlers can have closures over the state generated inside the factory function.
-    // This is useful for when managing state of long lived streams.
-
-    const streamSharedState = 0;
-
-    return async function handler(
-      // The data payload into the route.
-      data: someApiRoute.DataServerReceives,
-      // The context of the route.
-      context: {
-        // The application wide state.
-        app: ServerState,
-        // The connection specific state.
-        connection: ServerConnectionState,
-        // The task that is being executed in.
-        // You can use this to abort the entire route.
-        task: Task
+    let accumulator = 0;
+    return async (data, context) => {
+      if (accumulator > 0xffff) {
+        context.task.cancel("overflow");
       }
-    ): someApiRoute.DataClientReceives {
-      // Your server logic here.
-      // You must never throw an error.
-      // Use the task to abort the route if necessary.
-      streamSharedState++
+      accumulator += data.value;
+      return { result: accumulator.toString() };
+    };
+  },
+  // In all streams, you must provide a buffer size.
+  //
+  // The size of the buffer in send-recv streams will determine the maximum number
+  // of tasks that can be queued before deferring to the main buffer.
+  //
+  // The order of replies is guaranteed. The buffered tasks will be processed in series.
+  //
+  // If the buffer is full, buffering will be deferred to the main buffer.
+  // If that is full, messages will be lost and the connection will be terminated.
+  10,
+);
 
-      return someApiRoute.DataClientReceives
-    }
-  }
-)
+// For this route, the client will act as the receiver and the server will act as the sender.
+const serverTailLogsRoute = tailLogsRoute.server.asSendStreamOnly(10);
+
+// Duplex routes are by far the most complex to implement.
+//
+// This is because they have bidirectional streams that aren't dependent on each other.
+//
+// In the context of a server you will have to implement both the send and recv streams
+// as handlers within a factory function.
+const serverEventStreamRoute = eventStreamRoute.server
+  // You can require that a route be bound with a specific app state.
+  //
+  // This app state must be injected later when the route is bound to the router.
+  .withApp<{ db: { logs: Map<number, [number, string]> } }>()
+
+  // You can require that a route be bound with a specific connection state.
+  //
+  // This connection state must be injected later when the route is bound to the router.
+  .withConnection<{ sessionId: number }>()
+  .asRecvDuplex(
+    () => {
+      let latestLogId = 0;
+      const clientLogs = new Set<number>();
+
+      return {
+        async send(context, send) {
+          while (true && typeof context.task.isCancelled() !== "string") {
+            const logs: string[] = [];
+            for (const [id, [clientId, log]] of context.app.db.logs) {
+              if (id <= latestLogId || clientLogs.has(clientId)) {
+                continue;
+              }
+              logs.push(log);
+            }
+
+            if (send({ value: logs })) {
+              latestLogId = context.app.db.logs.size;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        },
+
+        recv(data, context) {
+          const key = context.app.db.logs.size;
+
+          for (const log of data.value) {
+            context.app.db.logs.set(key, [context.connection.sessionId, log]);
+
+            clientLogs.add(key);
+          }
+        },
+      };
+    },
+    // Unlike send-recv streams, both the send and recv actions advance in parallel with each other.
+    //
+    // The `send` and `recv` queues are guaranteed to be processed independently in order.
+    {
+      send: 100,
+      recv: 10,
+    },
+  );
 ```
 
 Things are simpler on the client as we only need to present a type safe 
@@ -224,20 +345,37 @@ interface to the api route (if it is a `send` route).
 
 __On the client__
 ```ts
+// Set up client routes.
+const clientMultiplyRoute = multiplyRoute.client.asSend();
+const clientToStringRoute = toStringRoute.client.asSendStream(1);
+// When you invert the sending direction, the role of client and server inverts.
+//
+// That means you must register event handlers as if the client were a server.
+//
+// This is because, while unlikely, it is completely valid for the server to
+// initiate multiple streams to the client.
+const clientTailLogsRoute = tailLogsRoute.client
+  .withApp<{ db: { logs: string[] } }>()
+  .asRecvStreamOnly(
+    () => (data, context) => context.app.db.logs.push(...data.logs),
+    1,
+  );
 
-import { someApiRoute } from "./api"
-
-// This creates a function that you may use to call after you've bound the socket.
-export const apiRoute = someApiRoute.client.asSend()
+const clientEventStreamRoute = eventStreamRoute.client
+  .withApp<{ db: { logs: string[] } }>()
+  .asSendDuplex({
+    send: 1,
+    recv: 10,
+  });
 ```
 
-Note that `send` and `recv` routes are not exclusive to the client or the server.
-You can have a `send` route on the server and a `recv` route on the client.
-The way these routes are declared on both the server and the client is the same.
-
-##### Using the route
+### Using the route
 
 Now that you've finally defined the route, you can use it in your application.
+
+Getting to this point may have seemed like a lot of work, but extreme care has
+been taken to ensure that you have full control over what you're doing with a
+minimal API surface.
 
 This framework doesn't dictate how you broker and manage the duplex connections, only
 that the connections implement the `Socket` interface.
@@ -259,8 +397,6 @@ __On the server__
 ```ts
 import { WebSocketServer } from "ws";
 import { NodeWsWebsocketSocket } from "undersea/clients/NodeWsWebsocketSocket";
-import { ServerState, ServerConnectionState } from "./api"
-import { apiRoute } from "./server"
 
 // Create a function that will keep the server running.
 async function createServerWebsocketConnection() {
@@ -276,14 +412,13 @@ async function createServerWebsocketConnection() {
     //
     // This is because the api is stateful.
     server.on("connection", async (ws) => {
-
       // Create a new socket for the connection.
       const socket = new NodeWsWebsocketSocket(
-        ws, 
+        ws,
         // You must set up how many messages the api is allowed to buffer.
         // Be judicious with this limit. You do not need nearly as many buffered
         // messages as you think you do.
-        { in: 100, out: 100 }
+        { in: 100, out: 100 },
       );
 
       // Create bindings for the server.
@@ -291,19 +426,49 @@ async function createServerWebsocketConnection() {
       // When creating bindings, what we're doing is essentially
       // providing the various runtime contexts to the api that
       // we could not otherwise statically provide.
-      const server = bindServer(
-        ServerState,
-        async () => ({
-          connection: ServerConnectionState,
-          socket 
-        })
-      );
+      const server = serverRouter()
+        // If our route requires a specific app state, we must provide it here
+        // or typescript will complain.
+        //
+        // If no app state is required, you can skip this.
+        .withApp({ db: { logs: new Map<number, [number, string]>() } })
+        .withConnection(async () => ({
+          // We need to always provide the connection socket.
+          socket,
+          // If our route requires a specific connection state, we must provide it here
+          // or typescript will complain.
+          connection: { sessionId: Math.floor(Math.random() * 0xffff) },
+        }))
+        // Finally you can bind your recv routes.
+        //
+        // While it might seem unwieldy to have to manually bind each route,
+        // this library is intended to work without any special compiler macro magic.
+        //
+        // If you're adventurous, you can write your own compiler to do this,
+        // but shipping that as a core feature is not something this library is concerned with.
+        //
+        // The routes provided are dynamically checked at runtime to ensure that all
+        // created routes are bound without duplicates.
+        .withRoutes(
+          serverMultiplyRoute,
+          serverToStringRoute,
+          serverEventStreamRoute,
+        )
+        // Start the server.
+        .start();
 
-      // Bind the api route to the server.
-      // This api route needs to be bound separately for each connection.
+      // Send routes are handled differently.
+      // You need to first provide the create server client from the server router
+      // to the send route.
       //
-      // It will now begin handling requests to the route.
-      apiRoute(server);
+      // The actions you call on the send routes will then be sent down that client.
+      if (
+        !serverTailLogsRoute
+          .connect(server)
+          .send({ logs: ["log 1", "log 2"] })
+      ) {
+        console.error("Failed to send logs");
+      }
     });
 
     await new Promise((ok) => {
@@ -312,62 +477,101 @@ async function createServerWebsocketConnection() {
   }
 }
 
+// Start the server.
 createServerWebsocketConnection();
 ```
 
 __On the client__
 ```ts
 import { BrowserWebsocketSocket } from "undersea/clients/BrowserWebsocketSocket";
-import { ClientState, ClientConnectionState, someApiRoute } from "./api"
-import { apiRoute } from "./server"
 
+// We now do the same thing for the client.
 let socket: BrowserWebsocketSocket;
 
-// Create a function that will keep the socket alive.
+// Create a function that will keep the a websocket socket alive.
 async function persistentWebsocketConnection() {
   while (true) {
-    const websocket = new WebSocket('wss://your.websocket');
+    const websocket = new WebSocket("wss://your.websocket");
 
     // Create a new socket for the connection.
     socket = new BrowserWebsocketSocket(
-      websocket, 
+      websocket,
       // You must set up how many messages the api is allowed to buffer.
       // Be judicious with this limit. You do not need nearly as many buffered
       // messages as you think you do.
-      { in: 100, out: 100 }
+      { in: 100, out: 100 },
     );
 
-    await new Promise((close) => websocket.addEventListener("close", close););
+    await new Promise((close) => websocket.addEventListener("close", close));
   }
 }
 
 persistentWebsocketConnection();
 
-// Create bindings for the client.
+// Unlike the on the server, we aren't managing multiple connections.
+// A client only (usually) has one connection.
 //
-// When creating bindings, what we're doing is essentially
-// providing the various runtime contexts to the api that
-// we could not otherwise statically provide.
-const client = bindClient(
-  ClientState,
-  async () => ({
-    connection: ClientConnectionState,
-    socket 
-  })
-)
+// You need to instead, we create a client object that we pass around to
+// dynamically bind routes to.
+const client = clientRouter()
+  // Again you must provide the app state if a route requires it.
+  //
+  // You will get a type error if you miss this when required.
+  .withApp({ db: { logs: [] } })
+  .withConnection(() => Promise.resolve({ socket }))
+  .withRoutes(
+    // Here we need to bind the client tail logs route.
+    //
+    // This is because the client is acting as the server for this route.
+    clientTailLogsRoute,
+  )
+  // Start the router in dynamic mode,
+  // allowing late binding of routes.
+  .start();
 
-// Before use, the api route must be bound to the client.
-// Since the client is kept alive you can choose to bind the api route
-// once and export it to the rest of your application.
+// Send routes may fail to send if the buffer is full or the connection is closed.
+try {
+  const { result } = await clientMultiplyRoute.connect(client).send({
+    a: 10,
+    b: 100,
+  });
+  console.log(result)
+} catch {
+  console.log("Failed to send");
+}
+
+// Send stream routes create a server side context, so you cannot immediately
+// bind and invoke them in a loop.
+const toStringRouteInstance = clientToStringRoute.connect(client);
+// Send stream routes may fail to send if the buffer is full or the connection is closed.
+for (let value = 0; value < 10; value++) {
+  try {
+    const { result } = await toStringRouteInstance.send({ value });
+    console.log(result)
+  } catch {
+    console.log("Failed to send");
+  }
+}
+
+// Duplex routes provide send methods and recv callbacks.
+const eventStream = clientEventStreamRoute.connect(client);
+const logs: string[] = [];
+
+// Recv callbacks must be bound before the send method is called.
+eventStream.recv((data, context) => {
+  context.app.db.logs.push(...data.value);
+  logs.push(...data.value);
+});
+
+// Like other routes, sends may fail if the buffer is full or the connection is closed.
 //
-// Errors in the binding will be thrown when the route is used.
-const api = apiRoute(client);
-
-// This now works.
-const response = await api(someApiRoute.DataServerReceives)
+// Unlike other routes, duplex connections don't provide a response.
+if (!eventStream.send({ value: ["log 1", "log 2"] })) {
+  console.log("Failed to send");
+}
 ```
 
-##### Error handling
+### Error handling
 
 Throwing an error inside an API route is undefined behavior.
 
@@ -375,12 +579,12 @@ Always use errors as values if you need errors.
 
 You may cancel and route on the server by using the `task` object passed to the handler.
 
-##### Testing
+### Testing
 
 There is no way to test that things work now.
 I don't even know how to go about doing that.
 
-##### Security
+### Security
 
 Rate limiting and bandwidth throttling is not implemented here yet.
 
@@ -397,11 +601,11 @@ You may want to implement rate limiting by providing a connection rate limiter f
 in the connection state. You can then consume this inside the api routes to pause the
 route if the client is sending too many requests.
 
-##### Reliability
+### Reliability
 
 Some testing has been done, but not enough to say that this is reliable.
 
-##### Performance
+### Performance
 
 The million dollar question eh?
 
@@ -471,7 +675,7 @@ Default package exports are a bitch to maintain and I seriously can't be fucked.
 Import exactly what you're using from the source code.
 
 
-##### Warning on bundling
+### Warning on bundling
 
 You are required to use a bundler that can compile a `typescript` dependency as
 this only ships with `typescript` source files.
@@ -479,11 +683,11 @@ this only ships with `typescript` source files.
 Personally I would use `vite-node`, `deno` or `bun` as typescript is handled
 natively in these environments.
 
-##### Using with frameworks like `nextjs`
+### Using with frameworks like `nextjs`
 
 Don't know. Haven't tried it. You're on your own.
 
-##### A note on versioning
+### A note on versioning
 
 We're currently using "whatever the fuck I feel like versioning".
 
