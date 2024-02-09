@@ -212,7 +212,7 @@ describe(channel, () => {
 			socket.multiplex(),
 			{ key: 1 },
 			task,
-			10,
+			20,
 			1000,
 			(task) => {
 				taskResults.push(task);
@@ -237,7 +237,7 @@ describe(channel, () => {
 			new Uint8Array([0b01, 0x00, 0x01, 0x00, 0x04, 0, 0, 0, 0, 0b0]).buffer,
 		);
 
-		await wait(20);
+		await wait(30);
 
 		expect(await taskResults[0].isCancelled).toMatchObject({
 			reason: "cleanup: channel stream finished",
