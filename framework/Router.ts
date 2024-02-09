@@ -128,7 +128,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new stream route that is initiated by the server.
 	 *
 	 * # Example
 	 *
@@ -146,7 +146,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new simplex stream route that is initiated by the server.
 	 *
 	 * # Example
 	 *
@@ -164,7 +164,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new duplex stream route that is initiated by the server.
 	 *
 	 * # Example
 	 *
@@ -182,7 +182,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new send route that is initiated by the client.
 	 *
 	 * # Example
 	 *
@@ -200,7 +200,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new stream route that is initiated by the client.
 	 *
 	 * # Example
 	 *
@@ -218,7 +218,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new simplex stream route that is initiated by the client.
 	 *
 	 * # Example
 	 *
@@ -236,7 +236,7 @@ export class Router {
 	}
 
 	/**
-	 * Registers a new send route that is initiated by the server.
+	 * Registers a new duplex stream route that is initiated by the client.
 	 *
 	 * # Example
 	 *
