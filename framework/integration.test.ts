@@ -6,6 +6,7 @@ import { CircularBuffer } from "../lib/CircularBuffer";
 import { VirtualSocket } from "../clients/VirtualSocket";
 import { Codec } from "./Codec";
 import { Service } from "./Service";
+import { Task } from "../lib/Task";
 
 function createSocketPair(): [Socket, Socket] {
 	const a = new VirtualSocket({ in: 100, out: 100 });
@@ -127,7 +128,7 @@ describe("Initiate-Endpoint", async () => {
 
 	it("opens a connection between initiator and endpoint", async () => {
 		expect(endpointSocketListeners()).toBe(3);
-		const client = await initiate.start(clientAction);
+		const client = await initiate.start(new Task(),clientAction);
 
 		client.loadInternal("dog");
 		client.loadInternal("cat");
@@ -146,7 +147,7 @@ describe("Initiate-Endpoint", async () => {
 	});
 
 	it("opens a second connection between initiator and endpoint", async () => {
-		const client = await initiate.start(clientAction);
+		const client = await initiate.start(new Task(),clientAction);
 		client.send.push("mom");
 		client.send.push("dad");
 		client.send.push("kid");
@@ -164,12 +165,12 @@ describe("Initiate-Endpoint", async () => {
 	});
 
 	it("correctly multiplexes connections", async () => {
-		const client1 = await initiate.start(clientAction);
+		const client1 = await initiate.start(new Task(),clientAction);
 		// Because we're testing this in a single thread,
 		// we must yield to the event loop to allow the
 		// server to properly buffer the connection.
 		await new Promise((ok) => setTimeout(ok, 1));
-		const client2 = await initiate.start(clientAction);
+		const client2 = await initiate.start(new Task(), clientAction);
 		const recv2 = client2.recv.take();
 		const recv1 = client1.recv.take();
 		client1.send.push("cos");

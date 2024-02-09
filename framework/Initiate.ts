@@ -40,6 +40,7 @@ export class Initiate<
 	 * @param context A context factory that returns the current context.
 	 */
 	public async start(
+		task: Task,
 		context: () => Promise<{
 			socket: Socket;
 			app: App;
@@ -47,7 +48,6 @@ export class Initiate<
 		}>,
 	): Promise<Omit<ServiceHandler, "internal" | "external" | "validate">> {
 		return context().then(({ socket, app, connection }) => {
-			const task = new Task();
 			const serviceHandler = this.context.createService({
 				app,
 				connection,

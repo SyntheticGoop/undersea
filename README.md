@@ -561,6 +561,11 @@ eventStream.recv((data, context) => {
 if (!eventStream.send({ value: ["log 1", "log 2"] })) {
   console.log("Failed to send");
 }
+
+// Once you are done with a connection, you must dispose of it.
+//
+// This is not automatically done for you.
+eventStream.drop();
 ```
 
 ### Error handling

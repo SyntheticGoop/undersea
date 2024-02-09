@@ -169,7 +169,8 @@ export class Route<
 						"Route was not created on the same router as the client.",
 					);
 
-				const route = initiate.start(context);
+				const task = new Task();
+				const route = initiate.start(task, context);
 				/**
 				 * Sends input and receives output.
 				 *
@@ -182,6 +183,8 @@ export class Route<
 					const service = await route;
 					const response = service.takeExternal();
 					if (!service.loadInternal(payload)) throw Error("Failed to send");
+					await response
+					task.cleanup("done");
 					return response;
 				}
 				return { send };
@@ -263,6 +266,8 @@ export class Route<
 	 *
 	 * instance.send("hello")
 	 * instance.send("world")
+	 *
+	 * instance.drop() // Closes the connection.
 	 * ```
 	 *
 	 * @param buffer The number of requests that can be queued.
@@ -285,6 +290,10 @@ export class Route<
 			 * @throws Error if the input cannot be sent or the connection is closed.
 			 */
 			send: (data: ServerRecv) => Promise<ClientRecv>;
+			/**
+			 * Closes and disposes of the connection.
+			 */
+			drop(): void;
 		}
 	> {
 		this.once();
@@ -312,7 +321,8 @@ export class Route<
 					throw Error(
 						"Route was not created on the same router as the client.",
 					);
-				const connection = initiate.start(context);
+				const task = new Task();
+				const connection = initiate.start(task, context);
 
 				const query = connection.then((service) => {
 					/**
@@ -349,8 +359,13 @@ export class Route<
 					const loadedQuery = await query;
 					return loadedQuery(data);
 				}
-
-				return { send };
+				/**
+				 * Closes and disposes of the connection.
+				 */
+				function drop() {
+					task.cleanup("done");
+				}
+				return { send, drop };
 			},
 			key: this.context.key,
 			identity: this.context.identity,
@@ -447,6 +462,8 @@ export class Route<
 	 * const instance = sendStreamRoute.connect(client)
 	 * instance.send("hello")
 	 * instance.send("world")
+	 *
+	 * instance.drop() // Closes the connection.
 	 * ```
 	 *
 	 * @param buffer The number of requests that can be queued.
@@ -465,6 +482,10 @@ export class Route<
 			 * @returns `false` if the input cannot be sent.
 			 */
 			send(data: ServerRecv): Promise<boolean>;
+			/**
+			 * Closes and disposes of the connection.
+			 */
+			drop(): void;
 		}
 	> {
 		this.once();
@@ -492,7 +513,8 @@ export class Route<
 					throw Error(
 						"Route was not created on the same router as the client.",
 					);
-				const connection = initiate.start(context);
+				const task = new Task();
+				const connection = initiate.start(task, context);
 
 				/**
 				 * Sends input and receives output.
@@ -508,7 +530,14 @@ export class Route<
 					return service.loadInternal(data);
 				}
 
-				return { send };
+				/**
+				 * Closes and disposes of the connection.
+				 */
+				function drop() {
+					task.cleanup("done");
+				}
+
+				return { send, drop };
 			},
 			key: this.context.key,
 			identity: this.context.identity,
@@ -607,6 +636,8 @@ export class Route<
 	 * instance.send("world")
 	 *
 	 * instance.recv((data) => console.log(data))
+	 *
+	 * instance.drop() // Closes the connection.
 	 * ```
 	 *
 	 * @param buffer The number of requests that can be queued.
@@ -638,6 +669,10 @@ export class Route<
 			 * @returns `false` if the input buffer is full.
 			 */
 			send(data: ServerRecv): boolean;
+			/**
+			 * Closes and disposes of the connection.
+			 */
+			drop(): void;
 		}
 	> {
 		this.once();
@@ -656,6 +691,7 @@ export class Route<
 						"Route was not created on the same router as the client.",
 					);
 				let loadInternal: (payload: ServerRecv) => boolean = () => false;
+				const task = new Task();
 
 				async function recv(
 					handler: (
@@ -693,7 +729,7 @@ export class Route<
 						},
 					});
 
-					const connection = await initiate.start(context);
+					const connection = await initiate.start(task, context);
 					const service = connection;
 
 					loadInternal = service.loadInternal;
@@ -709,10 +745,17 @@ export class Route<
 				function send(payload: ServerRecv): boolean {
 					return loadInternal(payload);
 				}
+				/**
+				 * Closes and disposes of the connection.
+				 */
+				function drop() {
+					task.cleanup("done");
+				}
 
 				return {
 					send,
 					recv,
+					drop,
 				};
 			},
 			key: this.context.key,
