@@ -61,10 +61,10 @@ export class Route<
 		type AllActions =
 			| "asSend"
 			| "asRecv"
+			| "asSendChannel"
+			| "asRecvChannel"
 			| "asSendStream"
 			| "asRecvStream"
-			| "asSendStreamOnly"
-			| "asRecvStreamOnly"
 			| "asSendDuplex"
 			| "asRecvDuplex";
 
@@ -254,12 +254,12 @@ export class Route<
 	 * # Example
 	 *
 	 * ```ts
-	 * const sendStreamRoute = route.asSendStream(
+	 * const sendChannelRoute = route.asSendChannel(
 	 *  1, // Number of queued requests.
 	 *  (data): data is boolean => typeof data === "boolean"
 	 * )
 	 *
-	 * const instance = sendStreamRoute.connect(client)
+	 * const instance = sendChannelRoute.connect(client)
 	 *
 	 * instance.send("hello")
 	 * instance.send("world")
@@ -268,7 +268,7 @@ export class Route<
 	 * @param buffer The number of requests that can be queued.
 	 * @param schema Validates data received on the wire.
 	 */
-	public asSendStream(
+	public asSendChannel(
 		buffer: number,
 		schema?: (data: unknown) => data is ClientRecv,
 	): ClientConnectRoute<
@@ -363,7 +363,7 @@ export class Route<
 	 * # Example
 	 *
 	 * ```ts
-	 * const recvStreamRoute = route.asRecvStream(
+	 * const recvChannelRoute = route.asRecvChannel(
 	 *  (data) => Promise.resolve(data * 2),
 	 *  1, // Number of queued requests.
 	 *  (data): data is number => typeof data === "number"
@@ -371,7 +371,7 @@ export class Route<
 	 *
 	 * serverRouter()
 	 *   ...
-	 *   .withRoute(recvStreamRoute)
+	 *   .withRoute(recvChannelRoute)
 	 *   .start()
 	 * ```
 	 *
@@ -379,7 +379,7 @@ export class Route<
 	 * @param buffer The number of requests that can be queued.
 	 * @param schema Validates data received on the wire.
 	 */
-	public asRecvStream(
+	public asRecvChannel(
 		createHandler: () => (
 			/**
 			 * Input received.
@@ -440,18 +440,18 @@ export class Route<
 	 * # Example
 	 *
 	 * ```ts
-	 * const sendStreamOnlyRoute = route.asSendStreamOnly(
+	 * const sendStreamOnlyRoute = route.asSendStream(
 	 *  1, // Number of queued requests.
 	 * )
 	 *
-	 * const instance = sendStreamOnlyRoute.connect(client)
+	 * const instance = sendStreamRoute.connect(client)
 	 * instance.send("hello")
 	 * instance.send("world")
 	 * ```
 	 *
 	 * @param buffer The number of requests that can be queued.
 	 */
-	public asSendStreamOnly(buffer: number): ClientConnectRoute<
+	public asSendStream(buffer: number): ClientConnectRoute<
 		App,
 		Connection,
 		Socket,
@@ -521,7 +521,7 @@ export class Route<
 	 * # Example
 	 *
 	 * ```ts
-	 * const recvStreamOnlyRoute = route.asRecvStreamOnly(
+	 * const recvStreamRoute = route.asRecvStream(
 	 *  (data) => console.log(data),
 	 *  1, // Number of queued requests.
 	 *  (data): data is string => typeof data === "string"
@@ -529,7 +529,7 @@ export class Route<
 	 *
 	 * serverRouter()
 	 *   ...
-	 *   .withRoute(recvStreamOnlyRoute)
+	 *   .withRoute(recvStreamRoute)
 	 *   .start()
 	 * ```
 	 *
@@ -537,7 +537,7 @@ export class Route<
 	 * @param buffer The number of requests that can be queued.
 	 * @param schema Validates data received on the wire.
 	 */
-	public asRecvStreamOnly(
+	public asRecvStream(
 		createHandler: () => (
 			/**
 			 * Input received.

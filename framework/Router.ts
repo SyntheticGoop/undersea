@@ -134,15 +134,15 @@ export class Router {
 	 *
 	 * ```ts
 	 * const { server, client } = router
-	 *   .routeServerSendStream()
+	 *   .routeServerSendChannel()
 	 *   .define<{ val: number }, { isEven: boolean }>();
 	 *
-	 * server.asSendStream(...);
-	 * client.asRecvStream(...);
+	 * server.asSendChannel(...);
+	 * client.asRecvChannel(...);
 	 * ```
 	 */
-	public routeServerSendStream() {
-		return this.route("server send stream");
+	public routeServerSendChannel() {
+		return this.route("server channel");
 	}
 
 	/**
@@ -152,14 +152,14 @@ export class Router {
 	 *
 	 * ```ts
 	 * const { server, client } = router
-	 *   .routeServerSendStreamOnly()
+	 *   .routeServerSendStream()
 	 *   .define<{ val: number }, { isEven: boolean }>();
 	 *
-	 * server.asSendStreamOnly(...);
-	 * client.asRecvStreamOnly(...);
+	 * server.asSendStream(...);
+	 * client.asRecvStream(...);
 	 * ```
 	 */
-	public routeServerSendStreamOnly() {
+	public routeServerSendStream() {
 		return this.route("server stream");
 	}
 
@@ -206,15 +206,15 @@ export class Router {
 	 *
 	 * ```ts
 	 * const { server, client } = router
-	 *	 .routeClientSendStream()
+	 *	 .routeClientSendChannel()
 	 *   .define<{ val: number }, { isEven: boolean }>();
 	 *
-	 * client.asSendStream(...);
-	 * server.asRecvStream(...);
+	 * client.asSendChannel(...);
+	 * server.asRecvChannel(...);
 	 * ```
 	 */
-	public routeClientSendStream() {
-		return this.route("client send stream");
+	public routeClientSendChannel() {
+		return this.route("client channel");
 	}
 
 	/**
@@ -224,14 +224,14 @@ export class Router {
 	 *
 	 * ```ts
 	 * const { server, client } = router
-	 *   .routeClientSendStreamOnly()
+	 *   .routeClientSendStream()
 	 *   .define<{ val: number }, { isEven: boolean }>();
 	 *
-	 * client.asSendStreamOnly(...);
-	 * server.asRecvStreamOnly(...);
+	 * client.asSendStream(...);
+	 * server.asRecvStream(...);
 	 * ```
 	 */
-	public routeClientSendStreamOnly() {
+	public routeClientSendStream() {
 		return this.route("client stream");
 	}
 
@@ -269,18 +269,18 @@ export class Router {
 	 * const serverActionA = actionA.server.asRecv(...);
 	 *
 	 * const actionB = route("server send stream").define<{ send: string }, { recv: string }>();
-	 * const clientActionB = actionB.server.asSendStream(...);
-	 * const serverActionB = actionB.client.asRecvStream(...);
+	 * const clientActionB = actionB.server.asSendChannel(...);
+	 * const serverActionB = actionB.client.asRecvChannel(...);
 	 * ```
 	 */
 	private route<
 		Method extends
 			| "server send"
-			| "server send stream"
+			| "server channel"
 			| "server stream"
 			| "server duplex"
 			| "client send"
-			| "client send stream"
+			| "client channel"
 			| "client stream"
 			| "client duplex",
 	>(method: Method) {
@@ -310,20 +310,20 @@ export class Router {
 				Method extends `server ${infer Type}`
 					? Type extends "send"
 						? "asSend"
-						: Type extends "send stream"
-						  ? "asSendStream"
+						: Type extends "channel"
+						  ? "asSendChannel"
 						  : Type extends "stream"
-							  ? "asSendStreamOnly"
+							  ? "asSendStream"
 							  : Type extends "duplex"
 								  ? "asSendDuplex"
 								  : never
 					: Method extends `client ${infer Type}`
 					  ? Type extends "send"
 							? "asRecv"
-							: Type extends "send stream"
-							  ? "asRecvStream"
+							: Type extends "channel"
+							  ? "asRecvChannel"
 							  : Type extends "stream"
-								  ? "asRecvStreamOnly"
+								  ? "asRecvStream"
 								  : Type extends "duplex"
 									  ? "asRecvDuplex"
 									  : never
@@ -341,20 +341,20 @@ export class Router {
 				Method extends `client ${infer Type}`
 					? Type extends "send"
 						? "asSend"
-						: Type extends "send stream"
-						  ? "asSendStream"
+						: Type extends "channel"
+						  ? "asSendChannel"
 						  : Type extends "stream"
-							  ? "asSendStreamOnly"
+							  ? "asSendStream"
 							  : Type extends "duplex"
 								  ? "asSendDuplex"
 								  : never
 					: Method extends `server ${infer Type}`
 					  ? Type extends "send"
 							? "asRecv"
-							: Type extends "send stream"
-							  ? "asRecvStream"
+							: Type extends "channel"
+							  ? "asRecvChannel"
 							  : Type extends "stream"
-								  ? "asRecvStreamOnly"
+								  ? "asRecvStream"
 								  : Type extends "duplex"
 									  ? "asRecvDuplex"
 									  : never

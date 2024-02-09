@@ -7,8 +7,8 @@ import { clientRouter  } from "../../api";
 import * as getGameState from "../../api/getGameState";
 import * as setTableSize from "../../api/setTableSize";
 
-const getGameStateHandler = getGameState.client.asSendStream(10);
-const setTableSizeHandler = setTableSize.client.asSendStreamOnly(50);
+const getGameStateHandler = getGameState.client.asSendChannel(10);
+const setTableSizeHandler = setTableSize.client.asSendStream(50);
 
 export function Pong() {
 	const [p1Ref, setP1Ref] = createSignal<PositionControl>();

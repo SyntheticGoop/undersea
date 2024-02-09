@@ -109,21 +109,21 @@ With these two types of routes there are 4 different variants of routes.
 - `asSend` and `asRecv`: These connections are single use and will return one result before closing.
   You should recognize these as traditional request/response routes.
 
-- `asSendStream` and `asRecvStream`: These are long lived streams that can be used to send and receive multiple messages.
+- `asSendChannel` and `asRecvChannel`: These are long lived streams that can be used to send and receive multiple messages.
   Each message is paired with a response and there can only be one message-response pair in flight at a time.
   These connections are similar to the `asSend` and `asRecv` connections but can be used to maintain state on the server over the duration of the stream.
 
-- `asSendStreamOnly` and `asRecvStreamOnly`: These are long lived streams that can be used to either stream data to or receive streams from the connection.
+- `asSendStream` and `asRecvStream`: These are long lived streams that can be used to either stream data to or receive streams from the connection.
   As these are connections either do not have a response or a payload, they can be used in situations where you need to stream data without waiting for acknoledgement or a response.
 
 - `asSendStreamDuplex` and `asRecvStreamDuplex`: These are long lived streams that can be used to send and receive streams from the connection.
-  These function as a combination of `asSendStreamOnly` and `asRecvStreamOnly`, allowing a two way stream of data that does not wait on either side for a response.
+  These function as a combination of `asSendStream` and `asRecvStream`, allowing a two way stream of data that does not wait on either side for a response.
 
 You will make this choice when you're defining the route.
 ```ts
 router.route...Send           // `asSend` or `asRecv`
-router.route...SendStream     // `asSendStream` or `asRecvStream`
-router.route...SendStreamOnly // `asSendStreamOnly` or `asRecvStreamOnly`
+router.route...SendChannel     // `asSendChannel` or `asRecvChannel`
+router.route...SendStreamOnly // `asSendStream` or `asRecvStream`
 router.route...Duplex         // `asSendStreamDuplex` or `asRecvStreamDuplex`
 ```
 
@@ -199,7 +199,7 @@ Once your api is defined, you must define the handlers for the server and the cl
 
 Which handlers you can pick depends on your route definition.
 
-You may write a validation function for the responses to all routes as you may not want to trust the other side of the connection. The exception to this is the `asSendStreamOnly` as it never receives a response.
+You may write a validation function for the responses to all routes as you may not want to trust the other side of the connection. The exception to this is the `asSendStream` as it never receives a response.
 
 Additionally, for all `stream` type connections, you must set a buffer size.
 If the buffer is full:
@@ -235,7 +235,7 @@ const serverMultiplyRoute = multiplyRoute.server.asRecv(
   validateMultiplySend,
 );
 
-const serverToStringRoute = toStringRoute.server.asRecvStream(
+const serverToStringRoute = toStringRoute.server.asRecvChannel(
   // The action to take when the route is called.
   //
   // Stream routes are intended to be spawned repeatedly, therefore you must
@@ -269,7 +269,7 @@ const serverToStringRoute = toStringRoute.server.asRecvStream(
 );
 
 // For this route, the client will act as the receiver and the server will act as the sender.
-const serverTailLogsRoute = tailLogsRoute.server.asSendStreamOnly(10);
+const serverTailLogsRoute = tailLogsRoute.server.asSendStream(10);
 
 // Duplex routes are by far the most complex to implement.
 //
@@ -339,7 +339,7 @@ __On the client__
 ```ts
 // Set up client routes.
 const clientMultiplyRoute = multiplyRoute.client.asSend();
-const clientToStringRoute = toStringRoute.client.asSendStream(1);
+const clientToStringRoute = toStringRoute.client.asSendChannel(1);
 // When you invert the sending direction, the role of client and server inverts.
 //
 // That means you must register event handlers as if the client were a server.
@@ -348,7 +348,7 @@ const clientToStringRoute = toStringRoute.client.asSendStream(1);
 // initiate multiple streams to the client.
 const clientTailLogsRoute = tailLogsRoute.client
   .withApp<{ db: { logs: string[] } }>()
-  .asRecvStreamOnly(
+  .asRecvStream(
     () => (data, context) => context.app.db.logs.push(...data.logs),
     1,
   );
@@ -660,7 +660,7 @@ You will want to import the files from
 ```ts
 import {} from "undersea/framework"
 import {} from "undersea/clients/*"
-import {..} from "undersea/lib/Socket"
+import {} from "undersea/lib/Socket"
 ```
 
 Default package exports are a bitch to maintain and I seriously can't be fucked.

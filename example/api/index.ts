@@ -9,6 +9,6 @@ const router = new Router({
 });
 
 export const route0000 = router.routeClientSendStream();
-export const route0001 = router.routeClientSendStreamOnly();
+export const route0001 = router.routeClientSendStream();
 
 export const { clientRouter, serverRouter } = router;

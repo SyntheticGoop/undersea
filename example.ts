@@ -51,9 +51,9 @@ async function example() {
 	// To narrow down the generated route type we first specify who is initiating the connection. ("client" or "server")
 	// Followed by the kind of route we are defining. ("send", "send stream", "stream", or "duplex")
 	const route0001 = router.routeClientSend();
-	const route0002 = router.routeClientSendStream();
+	const route0002 = router.routeClientSendChannel();
 	// The connection does not need to be initiated by the client.
-	const route0003 = router.routeServerSendStreamOnly();
+	const route0003 = router.routeServerSendStream();
 	const route0004 = router.routeClientSendDuplex();
 
 	// Define routes
@@ -110,7 +110,7 @@ async function example() {
 		validateMultiplySend,
 	);
 
-	const serverToStringRoute = toStringRoute.server.asRecvStream(
+	const serverToStringRoute = toStringRoute.server.asRecvChannel(
 		// The action to take when the route is called.
 		//
 		// Stream routes are intended to be spawned repeatedly, therefore you must
@@ -144,7 +144,7 @@ async function example() {
 	);
 
 	// For this route, the client will act as the receiver and the server will act as the sender.
-	const serverTailLogsRoute = tailLogsRoute.server.asSendStreamOnly(10);
+	const serverTailLogsRoute = tailLogsRoute.server.asSendStream(10);
 
 	// Duplex routes are by far the most complex to implement.
 	//
@@ -208,7 +208,7 @@ async function example() {
 
 	// Set up client routes.
 	const clientMultiplyRoute = multiplyRoute.client.asSend();
-	const clientToStringRoute = toStringRoute.client.asSendStream(1);
+	const clientToStringRoute = toStringRoute.client.asSendChannel(1);
 	// When you invert the sending direction, the role of client and server inverts.
 	//
 	// That means you must register event handlers as if the client were a server.
@@ -217,7 +217,7 @@ async function example() {
 	// initiate multiple streams to the client.
 	const clientTailLogsRoute = tailLogsRoute.client
 		.withApp<{ db: { logs: string[] } }>()
-		.asRecvStreamOnly(
+		.asRecvStream(
 			() => (data, context) => context.app.db.logs.push(...data.logs),
 			1,
 		);

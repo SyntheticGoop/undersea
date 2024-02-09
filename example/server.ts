@@ -24,7 +24,7 @@ const getGameStateHandle = getGameState.server
 
 const setTableSizeHandle = setTableSize.server
 	.withConnection<Connection>()
-	.asRecvStreamOnly(
+	.asRecvStream(
 		() => {
 			return async (data, { connection: { engine } }) => {
 				engine.setTableSize(data.width, data.height);
