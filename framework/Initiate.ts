@@ -55,6 +55,8 @@ export class Initiate<
 			});
 			const service = mapServiceHandler(this.context.codec, serviceHandler);
 
+			socket.closed.then(() => task.cancel("socket closed"))
+
 			connect(
 				socket,
 				{

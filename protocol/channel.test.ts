@@ -45,6 +45,8 @@ class MockSocket implements Socket {
 		return socket;
 	}
 	public drop() {}
+
+	public closed: Promise<void> = Promise.resolve();
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>

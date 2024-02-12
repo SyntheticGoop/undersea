@@ -32,4 +32,9 @@ export interface Socket {
 	 * It must not stop sending on the socket unless the final socket is dropped.
 	 */
 	drop(): void;
+
+	/**
+	 * A promise that resolves when the socket is closed.
+	 */
+	readonly closed: Promise<void>;
 }

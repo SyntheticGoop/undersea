@@ -12,6 +12,8 @@ export class VirtualSocket implements Socket {
 	public readonly outBuffer: ConnectableCircularBuffer<ArrayBuffer>;
 	private inBufferShared: Set<CircularBuffer<ArrayBuffer>>;
 	private readonly thisInBuffer: CircularBuffer<ArrayBuffer>;
+	private killed = new CircularBuffer<void>(1);
+	public closed: Promise<void> = this.killed.take();
 
 	constructor(
 		private readonly bufferSize: {
@@ -50,17 +52,21 @@ export class VirtualSocket implements Socket {
 		};
 
 		this.inBufferShared.add(context.thisInBuffer);
+		const killed = new CircularBuffer<void>(1);
+		const closed: Promise<void> = killed.take();
 
 		return {
 			send: this.send.bind(this),
 			recv: this.recv.bind(context),
 			multiplex: this.multiplex.bind(this),
 			drop: () => {
+				killed.push();
 				context.thisInBuffer.drop();
 				this.inBufferShared.delete(context.thisInBuffer);
 
 				if (this.inBufferShared.size === 0) this.outBuffer.drop();
 			},
+			closed: Promise.race([closed, this.closed]),
 		};
 	}
 
@@ -71,13 +77,13 @@ export class VirtualSocket implements Socket {
 		if (this.inBufferShared.size === 0) this.outBuffer.drop();
 	}
 
-
 	/**
 	 * Drops all shared sockets.
-	 * 
+	 *
 	 * Use this to clean up a connection when it is no longer needed.
 	 */
 	dropAll() {
+		this.killed.push();
 		for (const buffer of this.inBufferShared) {
 			buffer.drop();
 		}

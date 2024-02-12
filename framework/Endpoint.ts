@@ -42,6 +42,8 @@ export class Endpoint<
 	) {
 		return context().then(({ socket, app, connection }) => {
 			const task = new Task();
+			socket.closed.then(() => task.cancel("socket closed"));
+
 			return channel(
 				socket,
 				{

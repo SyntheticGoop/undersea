@@ -47,6 +47,8 @@ class MockSocket implements Socket {
 	}
 
 	public drop() {}
+
+	public closed: Promise<void> = Promise.resolve();
 }
 
 describe(stream, () => {
