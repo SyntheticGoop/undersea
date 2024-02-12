@@ -27,6 +27,12 @@ export class BrowserWebsocketSocket extends VirtualSocket {
 		}
 		socket.addEventListener("open", async () => {
 			this.bindSend();
+
+			// Ping every 10 seconds until the socket is closed.
+			while (this.socket.readyState === WebSocket.OPEN) {
+				this.socket.send(new Uint8Array(0));
+				await new Promise((ok) => setTimeout(ok, 10000));
+			}
 		});
 	}
 

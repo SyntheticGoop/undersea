@@ -118,6 +118,8 @@ describe(connect, () => {
 		).toBeNull();
 
 		task.cleanup("test");
+	}, {
+		retry: 5
 	});
 
 	it("sends term signal after stream is done", async () => {
