@@ -36,9 +36,9 @@ export class NodeWsWebsocketSocket extends VirtualSocket {
 			this.bindSend();
 		}
 
-		socket.on("open", async () => {
-			this.bindSend();
-		});
+		socket.on("open", () => this.bindSend());
+
+		socket.on("close", () => this.drop());
 	}
 
 	private sendBound = false;
@@ -69,7 +69,7 @@ export class NodeWsWebsocketSocket extends VirtualSocket {
 	}
 
 	public drop() {
-		this.socket.on("close", () => super.drop());
+		super.dropAll()
 		this.socket.close();
 	}
 }

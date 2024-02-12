@@ -26,7 +26,7 @@ export interface Socket {
 	 * When a socket is multiplexed, buffers are duplicated across each
 	 * multiplexed socket. This resource must be disposed of when no longer needed.
 	 *
-	 * Calling drop stop this socket from being buffered, but leaves the other
+	 * Calling drop stops this socket from being buffered, but leaves the other
 	 * multiplexed sockets unaffected.
 	 *
 	 * It must not stop sending on the socket unless the final socket is dropped.

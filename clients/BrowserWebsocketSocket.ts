@@ -34,6 +34,8 @@ export class BrowserWebsocketSocket extends VirtualSocket {
 				await new Promise((ok) => setTimeout(ok, 10000));
 			}
 		});
+
+		socket.addEventListener("close", () => this.drop());
 	}
 
 	private sendBound = false;
@@ -64,7 +66,7 @@ export class BrowserWebsocketSocket extends VirtualSocket {
 	}
 
 	public drop() {
-		this.socket.addEventListener("close", () => super.drop());
+		super.dropAll()
 		this.socket.close();
 	}
 }

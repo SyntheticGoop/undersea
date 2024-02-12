@@ -70,4 +70,19 @@ export class VirtualSocket implements Socket {
 
 		if (this.inBufferShared.size === 0) this.outBuffer.drop();
 	}
+
+
+	/**
+	 * Drops all shared sockets.
+	 * 
+	 * Use this to clean up a connection when it is no longer needed.
+	 */
+	dropAll() {
+		for (const buffer of this.inBufferShared) {
+			buffer.drop();
+		}
+
+		this.inBufferShared.clear();
+		this.outBuffer.drop();
+	}
 }
