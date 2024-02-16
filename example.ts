@@ -55,6 +55,7 @@ async function example() {
 	// The connection does not need to be initiated by the client.
 	const route0003 = router.routeServerSendStream();
 	const route0004 = router.routeClientSendDuplex();
+	const route0005 = router.routeClientSendListen();
 
 	// Define routes
 	type MultiplySend = { a: number; b: number };
@@ -83,6 +84,13 @@ async function example() {
 	type EventStreamSend = { value: string[] };
 	type EventStreamRecv = { value: string[] };
 	const eventStreamRoute = route0004.define<EventStreamSend, EventStreamRecv>();
+
+	type StreamListenSend = { value: number };
+	type StreamListenRecv = { value: number };
+	const fibbonaciGeneratorRoute = route0005.define<
+		StreamListenSend,
+		StreamListenRecv
+	>();
 
 	// Extract the router.
 	const { serverRouter, clientRouter } = router;
@@ -168,7 +176,7 @@ async function example() {
 				const clientLogs = new Set<number>();
 
 				return {
-					async send(context, send) {
+					async send(send, context) {
 						while (true && typeof context.task.isCancelled() !== "string") {
 							const logs: string[] = [];
 							for (const [id, [clientId, log]] of context.app.db.logs) {
@@ -206,6 +214,24 @@ async function example() {
 			},
 		);
 
+	// This route demonstrates a stream based on an initial request.
+	const serverFibbonaciGeneratorRoute =
+		fibbonaciGeneratorRoute.server.asRecvListen(
+			() => ({
+				recv(init, send) {
+					let a = init.value;
+					let b = init.value;
+
+					for (let i = 0; i < 10; i++) {
+						send({ value: a });
+						[a, b] = [b, a + b];
+					}
+				},
+			}),
+			// The buffer size for the listen route is the maximum number of responses that can be queued.
+			10,
+		);
+
 	// Set up client routes.
 	const clientMultiplyRoute = multiplyRoute.client.asSend();
 	const clientToStringRoute = toStringRoute.client.asSendChannel(1);
@@ -227,6 +253,9 @@ async function example() {
 			send: 1,
 			recv: 10,
 		});
+
+	const clientFibbonaciGeneratorRoute =
+		fibbonaciGeneratorRoute.client.asSendListen(1);
 
 	// Create and start the server.
 
@@ -285,6 +314,7 @@ async function example() {
 						serverMultiplyRoute,
 						serverToStringRoute,
 						serverEventStreamRoute,
+						serverFibbonaciGeneratorRoute,
 					)
 					// Start the server.
 					.start();
@@ -402,4 +432,12 @@ async function example() {
 	//
 	// This is not automatically done for you.
 	eventStream.drop();
+
+	// Listen routes creates a stream based on an initial request.
+	const fibbonaciGenerator = clientFibbonaciGeneratorRoute
+		.connect(client)
+		.recv({ value: 1 }, console.log);
+
+	// Once you are done with a connection, you must dispose of it.
+	fibbonaciGenerator.drop();
 }

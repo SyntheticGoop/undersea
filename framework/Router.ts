@@ -164,6 +164,24 @@ export class Router {
 	}
 
 	/**
+	 * Registers a new listen stream route that is initiated by the server.
+	 *
+	 * # Example
+	 *
+	 * ```ts
+	 * const { server, client } = route
+	 *   .routeServerSendListen()
+	 *   .define<{ val: number }, { isEven: boolean }>();
+	 *
+	 * server.asSendListen(...);
+	 * client.asRecvListen(...);
+	 * ```
+	 */
+	public routeServerSendListen() {
+		return this.route("server listen");
+	}
+
+	/**
 	 * Registers a new duplex stream route that is initiated by the server.
 	 *
 	 * # Example
@@ -236,6 +254,24 @@ export class Router {
 	}
 
 	/**
+	 * Registers a new listen stream route that is initiated by the client.
+	 *
+	 * # Example
+	 *
+	 * ```ts
+	 * const { server, client } = router
+	 *   .routeClientSendListen()
+	 *   .define<{ val: number }, { isEven: boolean }>();
+	 *
+	 * client.asSendListen(...);
+	 * server.asRecvListen(...);
+	 * ```
+	 */
+	public routeClientSendListen() {
+		return this.route("client listen");
+	}
+
+	/**
 	 * Registers a new duplex stream route that is initiated by the client.
 	 *
 	 * # Example
@@ -260,6 +296,7 @@ export class Router {
 	 * - "send": A single request and response.
 	 * - "send stream": Repeated requests and response pairs.
 	 * - "stream": A continuous stream of data in one direction only.
+	 * - "listen": A response of a continuous stream of data in one direction only to an initial payload.
 	 * - "duplex": A continuous stream of data in both directions.
 	 *
 	 * # Example
@@ -278,10 +315,12 @@ export class Router {
 			| "server send"
 			| "server channel"
 			| "server stream"
+			| "server listen"
 			| "server duplex"
 			| "client send"
 			| "client channel"
 			| "client stream"
+			| "client listen"
 			| "client duplex",
 	>(method: Method) {
 		const self = this;
@@ -314,9 +353,11 @@ export class Router {
 						  ? "asSendChannel"
 						  : Type extends "stream"
 							  ? "asSendStream"
-							  : Type extends "duplex"
-								  ? "asSendDuplex"
-								  : never
+							  : Type extends "listen"
+								  ? "asSendListen"
+								  : Type extends "duplex"
+									  ? "asSendDuplex"
+									  : never
 					: Method extends `client ${infer Type}`
 					  ? Type extends "send"
 							? "asRecv"
@@ -324,9 +365,11 @@ export class Router {
 							  ? "asRecvChannel"
 							  : Type extends "stream"
 								  ? "asRecvStream"
-								  : Type extends "duplex"
-									  ? "asRecvDuplex"
-									  : never
+								  : Type extends "listen"
+									  ? "asRecvListen"
+									  : Type extends "duplex"
+										  ? "asRecvDuplex"
+										  : never
 					  : never
 			>({
 				codec: self.context.codec,
@@ -345,9 +388,11 @@ export class Router {
 						  ? "asSendChannel"
 						  : Type extends "stream"
 							  ? "asSendStream"
-							  : Type extends "duplex"
-								  ? "asSendDuplex"
-								  : never
+							  : Type extends "listen"
+								  ? "asSendListen"
+								  : Type extends "duplex"
+									  ? "asSendDuplex"
+									  : never
 					: Method extends `server ${infer Type}`
 					  ? Type extends "send"
 							? "asRecv"
@@ -355,9 +400,11 @@ export class Router {
 							  ? "asRecvChannel"
 							  : Type extends "stream"
 								  ? "asRecvStream"
-								  : Type extends "duplex"
-									  ? "asRecvDuplex"
-									  : never
+								  : Type extends "listen"
+									  ? "asRecvListen"
+									  : Type extends "duplex"
+										  ? "asRecvDuplex"
+										  : never
 					  : never
 			>({
 				codec: self.context.codec,

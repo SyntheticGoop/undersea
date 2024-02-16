@@ -8,7 +8,8 @@ const router = new Router({
 	},
 });
 
-export const route0000 = router.routeClientSendStream();
+export const route0000 = router.routeClientSendChannel();
 export const route0001 = router.routeClientSendStream();
+export const route0002 = router.routeClientSendListen();
 
 export const { clientRouter, serverRouter } = router;

@@ -65,6 +65,8 @@ export class Route<
 			| "asRecvChannel"
 			| "asSendStream"
 			| "asRecvStream"
+			| "asSendListen"
+			| "asRecvListen"
 			| "asSendDuplex"
 			| "asRecvDuplex";
 
@@ -183,7 +185,7 @@ export class Route<
 					const service = await route;
 					const response = service.takeExternal();
 					if (!service.loadInternal(payload)) throw Error("Failed to send");
-					await response
+					await response;
 					task.cleanup("done");
 					return response;
 				}
@@ -620,13 +622,233 @@ export class Route<
 	}
 
 	/**
+	 * Sends an initial payload and listens to output stream.
+	 *
+	 * Output stream is received as a response to input.
+	 *
+	 * # Example
+	 *
+	 * ```ts
+	 * const sendListenRoute = route.asSendListen(
+	 *  1, // Number of queued responses.
+	 *  (data): data is string => typeof data === "string"
+	 * )
+	 *
+	 * const instance = sendListenRoute.connect(client)
+	 * const listener = instance.recv(
+	 *   "hello",
+	 *   (data) => console.log(data)
+	 * ) // Open a new connection.
+	 *
+	 * listener.drop() // Close the connection.
+	 * ```
+	 *
+	 * @param buffer The number of requests that can be queued.
+	 * @param schema Validates data received on the wire.
+	 */
+	public asSendListen(
+		buffer: number,
+		schema?: (data: unknown) => data is ClientRecv,
+	): ClientConnectRoute<
+		App,
+		Connection,
+		Socket,
+		{
+			/**
+			 * Register a callback to receive data from the server.
+			 *
+			 * @param init The initial data to send.
+			 * @param handler The callback which will be called when data is received from the server.
+			 */
+			recv(
+				init: ServerRecv,
+				handler: (
+					data: ClientRecv,
+					context: RouteContext<App, Connection>,
+				) => void,
+			): {
+				/**
+				 * Closes and disposes of the connection.
+				 */
+				drop(): void;
+			};
+		}
+	> {
+		this.once();
+
+		const appContext = this.context;
+
+		return brandConnectRoute({
+			connect(
+				context: (() => Promise<Context<App, Connection, Socket>>) &
+					ClientConnectorBrand &
+					KeyIdentity,
+			) {
+				// @ts-expect-error: We know the identity exists.
+				if (this.identity !== context.identity)
+					throw Error(
+						"Route was not created on the same router as the client.",
+					);
+				const task = new Task();
+
+				function recv(
+					init: ServerRecv,
+					handler: (
+						data: ClientRecv,
+						context: RouteContext<App, Connection>,
+					) => void,
+				) {
+					const initiate = new Initiate({
+						...appContext,
+						createService(context: RouteContext<App, Connection>) {
+							// Binds the handler to the service.
+							// const handler = createHandler();
+
+							const service = many<ServerRecv, ClientRecv>(
+								{
+									internal: 1,
+									external: buffer,
+								},
+								schema,
+							);
+
+							// Listens for incoming data and handles it.
+							context.task.poll((task) =>
+								service
+									.takeExternal()
+									.then((payload) => {
+										if (typeof task.isCancelled() === "string") return null;
+
+										handler(payload, context);
+									})
+									.then(() => ({ value: undefined })),
+							);
+
+							return service;
+						},
+					});
+
+					initiate
+						.start(task, context)
+						.then((service) => {
+							service.loadInternal(init);
+						})
+						.catch(console.error);
+
+					return {
+						drop() {
+							task.cleanup("done");
+						},
+					};
+				}
+
+				return {
+					recv,
+				};
+			},
+			key: this.context.key,
+			identity: this.context.identity,
+		});
+	}
+
+	/**
+	 * Accept input and generate an output in parallel. Neither input nor output are dependent on each other.
+	 *
+	 * # Example
+	 *
+	 * ```ts
+	 * const recvDuplexRoute = route.asRecvDuplex(
+	 *  () => ({
+	 *    recv(init, send, context) {
+	 *      while (true) {
+	 *        send(init)
+	 *      }
+	 *    },
+	 *  })
+	 *  1, // Number of queued requests.
+	 *  (data): data is string => typeof data === "string"
+	 * )
+	 *
+	 * serverRouter()
+	 *   ...
+	 *   .withRoute(recvDuplexRoute)
+	 *   .start()
+	 * ```
+	 *
+	 * @param createHandler Create a handler to handle the data and another to generate a response. The created handlers are shared for the lifetime of the route.
+	 * @param buffer The number of requests that can be queued.
+	 * @param schema Validates data received on the wire.
+	 */
+	public asRecvListen(
+		createHandler: () => {
+			/**
+			 * The callback which will be called when data is received from the client.
+			 *
+			 * @param init The data received from the client.
+			 * @param send The function that can be called repeatedly to send data to the client. This function will return `false` if the send buffer is full.
+			 * @param context The context of the connection.
+			 */
+			recv: (
+				init: ServerRecv,
+				send: (data: ClientRecv) => boolean,
+				context: RouteContext<App, Connection>,
+			) => void;
+		},
+		/**
+		 * The number of sending tasks that can be queued before deferring to the main buffer.
+		 *
+		 * The order of replies is guaranteed. The buffered tasks will be processed in series.
+		 */
+		buffer: number,
+		schema?: (data: unknown) => data is ServerRecv,
+	): ServerConnectRoute<App, Connection> {
+		this.once();
+
+		const initiate = new Endpoint({
+			...this.context,
+			createService(context: RouteContext<App, Connection>) {
+				// Binds the handler to the service.
+				const { recv } = createHandler();
+
+				const service = many<ClientRecv, ServerRecv>(
+					{
+						internal: buffer,
+						external: 1,
+					},
+					schema,
+				);
+
+				// Listens for incoming data and handles it.
+				context.task.poll((task) =>
+					service
+						.takeExternal()
+						.then((init) => {
+							if (typeof task.isCancelled() === "string") return null;
+
+							recv(init, (data) => service.loadInternal(data), context);
+						})
+						.then(() => ({ value: undefined })),
+				);
+
+				return service;
+			},
+		});
+
+		return brandConnectRoute({
+			connect: initiate.start,
+			key: this.context.key,
+			identity: this.context.identity,
+		});
+	}
+
+	/**
 	 * Sends input and receives output in parallel. Neither input nor output are dependent on each other.
 	 *
 	 * # Example
 	 *
 	 * ```ts
 	 * const sendDuplexRoute = route.asSendDuplex(
-	 *  1, // Number of queued requests.
+	 *  { recv: 1, send: 1 }, // Number of queued requests.
 	 *  (data): data is string => typeof data === "string"
 	 * )
 	 *
@@ -778,7 +1000,7 @@ export class Route<
 	 *    },
 	 *    recv: (data) => console.log(data),
 	 *  })
-	 *  1, // Number of queued requests.
+	 *  { recv: 1, send: 1 }, // Number of queued requests.
 	 *  (data): data is string => typeof data === "string"
 	 * )
 	 *
@@ -797,12 +1019,12 @@ export class Route<
 			/**
 			 * Callback to which the sending handler will be registered.
 			 *
-			 * @param context The context of the connection.
 			 * @param send The function that can be called repeatedly to send data to the client. This function will return `false` if the send buffer is full.
+			 * @param context The context of the connection.
 			 */
 			send: (
-				context: RouteContext<App, Connection>,
 				send: (data: ClientRecv) => boolean,
+				context: RouteContext<App, Connection>,
 			) => void;
 			/**
 			 * The callback which will be called when data is received from the client.
@@ -856,7 +1078,7 @@ export class Route<
 						.then(() => ({ value: undefined })),
 				);
 
-				send(context, (data) => service.loadInternal(data));
+				send((data) => service.loadInternal(data), context);
 
 				return service;
 			},

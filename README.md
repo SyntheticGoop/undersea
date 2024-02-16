@@ -104,7 +104,7 @@ router.routeClient...() // The client is initiating the connection.
 router.routeServer...() // The server is initiating the connection.
 ```
 
-With these two types of routes there are 4 different variants of routes.
+With these two types of routes there are 5 different variants of routes.
 
 - `asSend` and `asRecv`: These connections are single use and will return one result before closing.
   You should recognize these as traditional request/response routes.
@@ -113,18 +113,23 @@ With these two types of routes there are 4 different variants of routes.
   Each message is paired with a response and there can only be one message-response pair in flight at a time.
   These connections are similar to the `asSend` and `asRecv` connections but can be used to maintain state on the server over the duration of the stream.
 
-- `asSendStream` and `asRecvStream`: These are long lived streams that can be used to either stream data to or receive streams from the connection.
-  As these are connections either do not have a response or a payload, they can be used in situations where you need to stream data without waiting for acknoledgement or a response.
+- `asSendStream` and `asRecvStream`: These are long lived streams that can be used to stream data to the connection.
+  As these are connections do not have a response, they can be used in situations where you need to stream data without waiting for acknoledgement or a response.
 
-- `asSendStreamDuplex` and `asRecvStreamDuplex`: These are long lived streams that can be used to send and receive streams from the connection.
+- `asSendListen` and `asRecvListen`: These are long lived streams that can be used to receive streams from the connection.
+  These are intended to be used in situations where you need to stream data in response to an initiating payload.
+  As these are connections do not have subsequent sends, they can be used in situations where you need to stream data without waiting for further input.
+
+- `asSendDuplex` and `asRecvDuplex`: These are long lived streams that can be used to send and receive streams from the connection.
   These function as a combination of `asSendStream` and `asRecvStream`, allowing a two way stream of data that does not wait on either side for a response.
 
 You will make this choice when you're defining the route.
 ```ts
 router.route...Send           // `asSend` or `asRecv`
-router.route...SendChannel     // `asSendChannel` or `asRecvChannel`
-router.route...SendStreamOnly // `asSendStream` or `asRecvStream`
-router.route...Duplex         // `asSendStreamDuplex` or `asRecvStreamDuplex`
+router.route...SendChannel    // `asSendChannel` or `asRecvChannel`
+router.route...SendStream     // `asSendStream` or `asRecvStream`
+router.route...SendListen     // `asSendListen` or `asRecvListen`
+router.route...SendDuplex     // `asSendDuplex` or `asRecvDuplex`
 ```
 
 
@@ -149,6 +154,7 @@ const route0002 = router.routeClientSendStream();
 // The connection does not need to be initiated by the client.
 const route0003 = router.routeServerSendStreamOnly();
 const route0004 = router.routeClientSendDuplex();
+const route0005 = router.routeClientSendListen();
 
 // Define routes
 type MultiplySend = { a: number; b: number };
@@ -178,6 +184,12 @@ type EventStreamSend = { value: string[] };
 type EventStreamRecv = { value: string[] };
 const eventStreamRoute = route0004.define<EventStreamSend, EventStreamRecv>();
 
+type StreamListenSend = { value: number };
+type StreamListenRecv = { value: number };
+const fibbonaciGeneratorRoute = route0005.define<
+  StreamListenSend,
+  StreamListenRecv
+>();
 ```
 
 Since creating a route is a side effect that modifies the router the order of
@@ -293,7 +305,7 @@ const serverEventStreamRoute = eventStreamRoute.server
       const clientLogs = new Set<number>();
 
       return {
-        async send(context, send) {
+        async send(send, context) {
           while (true && typeof context.task.isCancelled() !== "string") {
             const logs: string[] = [];
             for (const [id, [clientId, log]] of context.app.db.logs) {
@@ -330,6 +342,24 @@ const serverEventStreamRoute = eventStreamRoute.server
       recv: 10,
     },
   );
+
+// This route demonstrates a stream based on an initial request.
+const serverFibbonaciGeneratorRoute =
+  fibbonaciGeneratorRoute.server.asRecvListen(
+    () => ({
+      recv(init, send) {
+        let a = init.value;
+        let b = init.value;
+
+        for (let i = 0; i < 10; i++) {
+          send({ value: a });
+          [a, b] = [b, a + b];
+        }
+      },
+    }),
+    // The buffer size for the listen route is the maximum number of responses that can be queued.
+    10,
+  );
 ```
 
 Things are simpler on the client as we only need to present a type safe 
@@ -359,6 +389,9 @@ const clientEventStreamRoute = eventStreamRoute.client
     send: 1,
     recv: 10,
   });
+
+const clientFibbonaciGeneratorRoute =
+  fibbonaciGeneratorRoute.client.asSendListen(1);
 ```
 
 ### Using the route
@@ -445,6 +478,7 @@ async function createServerWebsocketConnection() {
           serverMultiplyRoute,
           serverToStringRoute,
           serverEventStreamRoute,
+          serverFibbonaciGeneratorRoute,
         )
         // Start the server.
         .start();
@@ -566,6 +600,14 @@ if (!eventStream.send({ value: ["log 1", "log 2"] })) {
 //
 // This is not automatically done for you.
 eventStream.drop();
+
+// Listen routes creates a stream based on an initial request.
+const fibbonaciGenerator = clientFibbonaciGeneratorRoute
+  .connect(client)
+  .recv({ value: 1 }, console.log);
+
+// Once you are done with a connection, you must dispose of it.
+fibbonaciGenerator.drop();
 ```
 
 ### Error handling
