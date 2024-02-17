@@ -28,8 +28,8 @@ export function stream(
 	return task.poll(async (task) => {
 		const data = await pull();
 
-		if (typeof task.isCancelled() === "string") return null;
-		if (data === null) return null;
+		if (typeof task.isCancelled() === "string") return false;
+		if (data === null) return false;
 
 		const step = atomic.next;
 

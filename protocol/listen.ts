@@ -25,7 +25,7 @@ export function listen(
 	push: (value: CancellableResult<ArrayBuffer>) => void,
 ) {
 	return task.poll(async (task) => {
-		if (typeof task.isCancelled() === "string") return null;
+		if (typeof task.isCancelled() === "string") return false;
 		const step = atomic.next;
 		const receivingTask = task.subtask().deadline(timeoutMs, "listen");
 
@@ -42,12 +42,12 @@ export function listen(
 		const data = await result;
 		receivingTask.cleanup("listen received");
 
-		if (typeof task.isCancelled() === "string") return null;
+		if (typeof task.isCancelled() === "string") return false;
 
 		if (typeof data.reason === "string") {
 			push(data);
 			task.cancel(data.reason);
-			return null;
+			return false;
 		}
 
 		send(
@@ -57,6 +57,6 @@ export function listen(
 		);
 
 		push({ value: data.value.buffer });
-		return { value: null };
+		return true;
 	});
 }

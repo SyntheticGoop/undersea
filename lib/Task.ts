@@ -29,6 +29,8 @@ export type TaskHandle<T> = TimeoutHandle<
 	CancelHandle<Promise<CancellableResult<T>>>
 >;
 
+const CANCELLED_ERROR = Symbol("cancelled");
+
 /**
  * A cancellable promise that can be resolved or rejected externally at any time.
  *
@@ -117,7 +119,27 @@ export class Task implements TimeoutHandle<CancelHandle<PromiseLike<string>>> {
 	/**
 	 * Polls a stream while the task is not cancelled.
 	 *
-	 * The polling function should return `null` when the stream is done.
+	 * You may use `task.job` safely in the polling function.
+	 * Only errors thrown from `task.job` are safely handled.
+	 *
+	 * The polling function should return `false` when the stream is done.
+	 * Return `true` to continue polling.
+	 *
+	 * Note that polling is blocking.
+	 *
+	 * ```ts
+	 * const task = new Task();
+	 *
+	 * task.poll(async task => {
+	 *   const data = await task.job(fetch("/some/async/resource"))
+	 *   if (data === null) return false
+	 *   await task.job(fetch("/some/async/endpoint", { data }));
+	 *   await task.job(10000)
+	 *
+	 *   return true
+	 * })
+	 *
+	 * ```
 	 *
 	 * @param pull The polling function to call.
 	 */
@@ -126,20 +148,77 @@ export class Task implements TimeoutHandle<CancelHandle<PromiseLike<string>>> {
 		 * The polling function to call.
 		 *
 		 * @param next The next task to poll.
+		 * @returns `true` if the task is running.
 		 * @returns A cancellable result if the task is running.
-		 * @returns `null` if the task is done.
+		 * @returns `false` if the task is done.
 		 */
-		pull: (next: this) => Promise<CancellableResult<unknown> | null>,
+		pull: (next: this) => Promise<CancellableResult<unknown> | boolean>,
 	): Promise<CancellableResult<void>> {
 		while (true) {
 			if (typeof this.cancelled === "string") return { reason: this.cancelled };
 
-			const next = await pull(this);
+			try {
+				const next = await pull(this);
 
-			if (next === null) return { value: undefined };
+				if (next === false) return { value: undefined };
 
-			if (typeof next.reason === "string") this.cancel(next.reason);
+				if (next === true) continue;
+
+				if (typeof next.reason === "string") this.cancel(next.reason);
+			} catch (error) {
+				if (error === CANCELLED_ERROR)
+					return { reason: this.cancelled ?? "cancelled" };
+				throw error;
+			}
 		}
+	}
+
+	/**
+	 * Runs a promise that resolves after a certain amount of time.
+	 *
+	 * If the task is cancelled before the deadline, the returned promise will reject.
+	 *
+	 * @param promise The task to await.
+	 * @param cancel A function to call when the task is cancelled.
+	 */
+	public job<T>(promise: Promise<T>, cancel?: () => void): Promise<T>;
+	/**
+	 * Returns a promise that resolves after a certain amount of time.
+	 *
+	 * If the task is cancelled before the deadline, the promise will reject.
+	 *
+	 * @param deadline The amount of time to wait before resolving.
+	 */
+	public job(deadline: number): Promise<void>;
+	public job<T>(
+		deadline: number | Promise<T>,
+		cancel?: () => void,
+	): Promise<T> | Promise<void> {
+		// Handle if deadline is a time
+		if (typeof deadline === "number") {
+			return new Promise<void>((resolve, reject) => {
+				let clear: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+					clear = null;
+					resolve();
+				}, deadline);
+
+				this.promise.finally(() => {
+					if (clear === null) return;
+					clearTimeout(clear);
+					clear = null;
+					reject(CANCELLED_ERROR);
+				});
+			});
+		}
+
+		// Handle if deadline is a promise
+		return Promise.race([
+			this.promise.then(() => {
+				cancel?.();
+				throw CANCELLED_ERROR;
+			}),
+			deadline,
+		]);
 	}
 
 	/**
