@@ -4,7 +4,7 @@
 	"version": "0.0.15",
 	"description": "Typed streaming api engine",
 	"scripts": {
-		"test": "vitest",
+		"test": "vitest --coverage --coverage.reportsDirectory .coverage",
 		"lint": "biome format --write . && biome lint --apply-unsafe ."
 	},
 	"workspaces": [
@@ -13,8 +13,9 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.7.3",
 		"@types/ws": "^8",
+		"@vitest/coverage-v8": "^1.6.0",
 		"typescript": "~5.0.0",
-		"vitest": "^1.2.2",
+		"vitest": "^1.6.0",
 		"ws": "~8.0.0"
 	},
 	"peerDependencies": {
