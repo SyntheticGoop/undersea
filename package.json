@@ -10,6 +10,7 @@
     "example"
   ],
   "devDependencies": {
+    "@biomejs/biome": "^1.7.3",
     "@types/ws": "^8",
     "typescript": "~5.0.0",
     "vitest": "^1.2.2",
