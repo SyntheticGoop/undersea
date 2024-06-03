@@ -257,12 +257,13 @@ export class Task implements TimeoutHandle<CancelHandle<PromiseLike<string>>> {
 		fn: (
 			isCancelled: IsCancelled,
 			resolve: (result: T) => void,
+			task: Task,
 		) => undefined | (() => void),
 	): TaskHandle<T> {
 		let cleanup: undefined | (() => void) = undefined;
 
 		const promise = new Promise<T>((resolve) => {
-			cleanup = fn(this.isCancelled, resolve);
+			cleanup = fn(this.isCancelled, resolve, this);
 		});
 
 		const wrappedPromise = Object.assign(this.race(promise).finally(cleanup), {

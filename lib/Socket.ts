@@ -1,3 +1,5 @@
+import type { Task } from "./Task";
+
 export interface Socket {
 	/**
 	 * Buffers data to be sent. Sending from buffer happens asynchronously.
@@ -11,9 +13,12 @@ export interface Socket {
 	 *
 	 * As the socket maintains a data buffer, this function should never be shared between multiple tasks.
 	 *
-	 * @returns A promise that resolves when data is received.
+	 * @returns A promise that resolves when data is received. This will throw if the socket is closed.
 	 */
-	recv(filter: (data: ArrayBuffer) => boolean): Promise<ArrayBuffer>;
+	recv(
+		filter: (data: ArrayBuffer) => boolean,
+		task: Task,
+	): Promise<ArrayBuffer>;
 
 	/**
 	 * Creates a clone of the socket with a replicated receive buffer.

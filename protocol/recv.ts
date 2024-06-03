@@ -21,7 +21,7 @@ export function recv<T = { buffer: ArrayBuffer; proto: Protocol }>(
 	},
 	task: Task,
 ): TaskHandle<T> {
-	return task.wrap((isCancelled, resolve) => {
+	return task.wrap((isCancelled, resolve, task) => {
 		if (typeof isCancelled() === "string") return () => {};
 		socket
 			.recv((data) => {
@@ -42,8 +42,8 @@ export function recv<T = { buffer: ArrayBuffer; proto: Protocol }>(
 				}
 
 				return false;
-			})
+			}, task)
 			// Socket is expected to be dropped here.
-			.catch(() => {});
+			.catch(() => task.cancel("Socket closed"));
 	});
 }

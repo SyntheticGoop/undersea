@@ -9,20 +9,38 @@ function wait(ms: number) {
 }
 
 class MockSocket implements Socket {
+	public closed: Promise<void>;
+	private close: () => void = () => {};
 	constructor(public delays: number[]) {
 		this.broadcast.add(this);
+
+		this.closed = new Promise((res) => {
+			this.close = res;
+		});
 	}
 
-	private readonly buffer: ArrayBuffer[] = [];
+	private buffer: ArrayBuffer[] = [];
+	recvLocks = 0;
 
-	public async recv(filter: (data: ArrayBuffer) => boolean) {
-		while (true) {
-			const buffer = this.buffer.shift();
-			if (buffer && filter(buffer)) {
-				return Promise.resolve(buffer);
+	public async recv(filter: (data: ArrayBuffer) => boolean, task: Task) {
+		this.recvLocks += 1;
+		try {
+			while (true) {
+				const buffer = this.buffer.shift();
+				if (buffer && filter(buffer)) {
+					return Promise.resolve(buffer);
+				}
+
+				const ok = await Promise.race([
+					wait(1).then(() => true),
+					this.closed.then(() => false),
+					task.isCancelled.then(() => false),
+				]);
+
+				if (!ok) throw new Error("Socket closed");
 			}
-
-			await wait(1);
+		} finally {
+			this.recvLocks -= 1;
 		}
 	}
 
@@ -36,8 +54,9 @@ class MockSocket implements Socket {
 		}
 	}
 
-	public multiplex(): MockSocket {
+	public multiplex(options?: { clone?: boolean }): MockSocket {
 		const socket = new MockSocket([]);
+		socket.buffer = options?.clone === true ? [...this.buffer] : [];
 
 		this.broadcast.add(socket);
 		socket.broadcast = this.broadcast;
@@ -45,9 +64,9 @@ class MockSocket implements Socket {
 		return socket;
 	}
 
-	public drop() {}
-
-	public closed: Promise<void> = Promise.resolve();
+	public drop() {
+		this.close();
+	}
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -169,5 +188,26 @@ describe(recv, () => {
 		socket.send(new Uint8Array([0b10, 0x00, 0x01, 0x00, 0x04, 1, 0, 1]).buffer);
 	});
 
-	it.todo("Ensure graceful handling of socket drop.");
+	it("gracefully handles socket drop", async () => {
+		const socket = new MockSocket([]);
+		const task = new Task();
+
+		const wait = recv(socket, { key: 1, nonce: 4, type: "MSG" }, task);
+
+		socket.drop();
+
+		await wait;
+		expect(socket.recvLocks).toBe(0);
+	});
+
+	it("gracefully handles task end", async () => {
+		const socket = new MockSocket([]);
+		const task = new Task();
+
+		const wait = recv(socket, { key: 1, nonce: 4, type: "MSG" }, task);
+
+		task.cleanup("test");
+		await wait;
+		expect(socket.recvLocks).toBe(0);
+	});
 });

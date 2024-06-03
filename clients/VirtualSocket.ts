@@ -1,6 +1,7 @@
 import type { Socket } from "../lib/Socket";
 import { CircularBuffer } from "../lib/CircularBuffer";
 import { ConnectableCircularBuffer } from "../lib/ConnectableCircularBuffer";
+import type { Task } from "../lib/Task";
 
 /**
  * A virtual socket that can be used for testing or to derive other sockets for.
@@ -38,12 +39,19 @@ export class VirtualSocket implements Socket {
 
 	public async recv(
 		filter: (data: ArrayBuffer) => boolean,
+		task: Task,
 	): Promise<ArrayBuffer> {
-		while (true) {
-			const value = await this.thisInBuffer.take();
+		while (typeof task.isCancelled() !== "string") {
+			const value = await Promise.race([
+				this.thisInBuffer.take(),
+				task.isCancelled.then(() => null),
+			]);
 
+			if (value === null) throw new Error("Task cancelled");
 			if (filter(value)) return value;
 		}
+
+		throw new Error("Task cancelled");
 	}
 
 	multiplex(): Socket {
@@ -71,6 +79,7 @@ export class VirtualSocket implements Socket {
 	}
 
 	drop() {
+		this.killed.push();
 		this.thisInBuffer.drop();
 		this.inBufferShared.delete(this.thisInBuffer);
 
@@ -83,12 +92,12 @@ export class VirtualSocket implements Socket {
 	 * Use this to clean up a connection when it is no longer needed.
 	 */
 	dropAll() {
-		this.killed.push();
 		for (const buffer of this.inBufferShared) {
 			buffer.drop();
 		}
 
 		this.inBufferShared.clear();
 		this.outBuffer.drop();
+		this.killed.push();
 	}
 }
