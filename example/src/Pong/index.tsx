@@ -1,7 +1,7 @@
 import { Ball } from "./Ball";
 import { Paddle } from "./Paddle";
 import { createSignal, onMount } from "solid-js";
-import { PositionControl } from "./PositionControl";
+import type { PositionControl } from "./PositionControl";
 import { BrowserWebsocketSocket } from "../../../clients/BrowserWebsocketSocket";
 import { clientRouter } from "../../api";
 import * as getGameState from "../../api/getGameState";
@@ -37,9 +37,13 @@ export function Pong() {
 		.start();
 
 	onMount(() => {
+		// biome-ignore lint/style/noNonNullAssertion: We know these are set.
 		const rect = boardRef()!.getBoundingClientRect();
+		// biome-ignore lint/style/noNonNullAssertion: We know these are set.
 		const p1 = p1Ref()!;
+		// biome-ignore lint/style/noNonNullAssertion: We know these are set.
 		const p2 = p2Ref()!;
+		// biome-ignore lint/style/noNonNullAssertion: We know these are set.
 		const ball = ballRef()!;
 
 		p1.setDelta(rect.x, rect.y);
@@ -54,6 +58,7 @@ export function Pong() {
 			.recv({ name: "tick" }, (update) => setFrame(update.frame));
 
 		async function advance() {
+			// biome-ignore lint/style/noNonNullAssertion: We know these are set.
 			const rect = boardRef()!.getBoundingClientRect();
 
 			while (true) {

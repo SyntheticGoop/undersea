@@ -1,4 +1,4 @@
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 import { CircularBuffer } from "../lib/CircularBuffer";
 import { ConnectableCircularBuffer } from "../lib/ConnectableCircularBuffer";
 

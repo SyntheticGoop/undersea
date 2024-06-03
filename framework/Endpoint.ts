@@ -1,10 +1,10 @@
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 import { channel } from "../protocol/channel";
 import { Task } from "../lib/Task";
-import { Config } from "./Config";
-import { Codec } from "./Codec";
+import type { Config } from "./Config";
+import type { Codec } from "./Codec";
 import { mapServiceHandler } from "./mapService";
-import { Service } from "./Service";
+import type { Service } from "./Service";
 
 export class Endpoint<
 	App,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listen } from "./listen";
-import { Socket } from "../lib/Socket";
-import { CancellableResult, Task } from "../lib/Task";
+import type { Socket } from "../lib/Socket";
+import { type CancellableResult, Task } from "../lib/Task";
 import { Atomic } from "../lib/Atomic";
 
 function wait(ms: number) {

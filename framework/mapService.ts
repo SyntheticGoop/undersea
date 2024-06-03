@@ -1,6 +1,6 @@
-import { CancellableResult } from "../lib/Task";
-import { Codec } from "./Codec";
-import { Service } from "./Service";
+import type { CancellableResult } from "../lib/Task";
+import type { Codec } from "./Codec";
+import type { Service } from "./Service";
 
 /**
  * Maps a service handler into a service to be hooked into the connection.

@@ -1,4 +1,4 @@
-import { PositionControl } from "./PositionControl";
+import type { PositionControl } from "./PositionControl";
 
 export class PongGameEngine {
 	data = {

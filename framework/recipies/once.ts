@@ -1,4 +1,4 @@
-import { Service } from "../Service";
+import type { Service } from "../Service";
 
 /**
  * Wrap a connection that will only allow one send and one receive.

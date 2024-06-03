@@ -1,6 +1,6 @@
 import { brand } from "./Protocol";
-import { Socket } from "../lib/Socket";
-import { Protocol } from "./Protocol";
+import type { Socket } from "../lib/Socket";
+import type { Protocol } from "./Protocol";
 
 /**
  * Sends data on a socket.

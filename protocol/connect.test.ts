@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { connect } from "./connect";
-import { Socket } from "../lib/Socket";
-import { CancellableResult, Task } from "../lib/Task";
+import type { Socket } from "../lib/Socket";
+import { type CancellableResult, Task } from "../lib/Task";
 
 function wait(ms: number) {
 	if (ms === 0) return Promise.resolve();
@@ -89,40 +89,44 @@ describe(connect, () => {
 		expect(sent).toMatchInlineSnapshot([[1, 0, 1, 0, 4, 0, 0, 0, 0, 0]]);
 	});
 
-	it("remains open until close if sig is acked", async () => {
-		const socket = new MockSocket([]);
-		const task = new Task();
+	it(
+		"remains open until close if sig is acked",
+		async () => {
+			const socket = new MockSocket([]);
+			const task = new Task();
 
-		socket.recv((data) => {
-			const view = new DataView(data);
-			if (view.getUint8(0) === 0b01) {
-				socket.send(
-					new Uint8Array([0b11, ...new Uint8Array(data.slice(1, 9))]).buffer,
-				);
-			}
-			return false;
-		});
+			socket.recv((data) => {
+				const view = new DataView(data);
+				if (view.getUint8(0) === 0b01) {
+					socket.send(
+						new Uint8Array([0b11, ...new Uint8Array(data.slice(1, 9))]).buffer,
+					);
+				}
+				return false;
+			});
 
-		const connection = connect(
-			socket.multiplex(),
-			{ key: 1, nonce: 4 },
-			task,
-			5,
-			1000,
-			() => wait(10000).then(() => new Uint8Array().buffer),
-			() => {},
-		);
+			const connection = connect(
+				socket.multiplex(),
+				{ key: 1, nonce: 4 },
+				task,
+				5,
+				1000,
+				() => wait(10000).then(() => new Uint8Array().buffer),
+				() => {},
+			);
 
-		await wait(5);
+			await wait(5);
 
-		expect(
-			await Promise.race([connection.isCancelled, wait(30).then(() => null)]),
-		).toBeNull();
+			expect(
+				await Promise.race([connection.isCancelled, wait(30).then(() => null)]),
+			).toBeNull();
 
-		task.cleanup("test");
-	}, {
-		retry: 5
-	});
+			task.cleanup("test");
+		},
+		{
+			retry: 5,
+		},
+	);
 
 	it("sends term signal after stream is done", async () => {
 		const socket = new MockSocket([]);

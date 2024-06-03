@@ -1,11 +1,11 @@
-import { Socket } from "../lib/Socket";
-import { Task } from "../lib/Task";
+import type { Socket } from "../lib/Socket";
+import type { Task } from "../lib/Task";
 import { connect } from "../protocol/connect";
 import { Atomic } from "../lib/Atomic";
-import { Config } from "./Config";
-import { Codec } from "./Codec";
+import type { Config } from "./Config";
+import type { Codec } from "./Codec";
 import { mapServiceHandler } from "./mapService";
-import { Service } from "./Service";
+import type { Service } from "./Service";
 
 /**
  * Initiates a connection.
@@ -55,7 +55,7 @@ export class Initiate<
 			});
 			const service = mapServiceHandler(this.context.codec, serviceHandler);
 
-			socket.closed.then(() => task.cancel("socket closed"))
+			socket.closed.then(() => task.cancel("socket closed"));
 
 			connect(
 				socket,

@@ -60,6 +60,7 @@ export class Task implements TimeoutHandle<CancelHandle<PromiseLike<string>>> {
 		this.promise = promise;
 
 		this.isCancelled = Object.assign(() => this.cancelled, {
+			// biome-ignore lint/suspicious/noThenProperty: This is a promise-like object.
 			then<TResult1 = void, TResult2 = never>(
 				onfulfilled?:
 					| ((state: { reason: string }) => TResult1 | PromiseLike<TResult1>)
@@ -103,6 +104,7 @@ export class Task implements TimeoutHandle<CancelHandle<PromiseLike<string>>> {
 	/**
 	 * Chains a callback to the promise.
 	 */
+	// biome-ignore lint/suspicious/noThenProperty: This is a promise-like object.
 	public then<TResult1 = void, TResult2 = never>(
 		onfulfilled?:
 			| ((value: string) => TResult1 | PromiseLike<TResult1>)

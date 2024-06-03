@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stream } from "./stream";
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 import { Task } from "../lib/Task";
 import { Atomic } from "../lib/Atomic";
 

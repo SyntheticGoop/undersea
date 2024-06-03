@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { channel } from "./channel";
-import { Socket } from "../lib/Socket";
-import { CancellableResult, Task } from "../lib/Task";
+import type { Socket } from "../lib/Socket";
+import { type CancellableResult, Task } from "../lib/Task";
 
 function wait(ms: number) {
 	if (ms === 0) return Promise.resolve();

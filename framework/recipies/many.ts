@@ -1,5 +1,5 @@
 import { CircularBuffer } from "../../lib/CircularBuffer";
-import { Service } from "../Service";
+import type { Service } from "../Service";
 
 /**
  * Wrap a connection that will allow many synchronous sends and receives.

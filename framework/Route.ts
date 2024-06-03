@@ -1,18 +1,18 @@
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 import { Task } from "../lib/Task";
-import { Config } from "./Config";
-import { Codec } from "./Codec";
+import type { Config } from "./Config";
+import type { Codec } from "./Codec";
 import { Initiate } from "./Initiate";
 import { Endpoint } from "./Endpoint";
 import { once } from "./recipies/once";
 import { many } from "./recipies/many";
 import {
-	Context,
+	type Context,
 	brandConnectRoute,
-	ServerConnectRoute,
-	ClientConnectRoute,
-	ClientConnectorBrand,
-	KeyIdentity,
+	type ServerConnectRoute,
+	type ClientConnectRoute,
+	type ClientConnectorBrand,
+	type KeyIdentity,
 } from "./ConnectRouter";
 
 type RouteContext<App, Connection> = Pick<

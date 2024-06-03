@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { recv } from "./recv";
 import { Task } from "../lib/Task";
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 
 function wait(ms: number) {
 	if (ms === 0) return Promise.resolve();

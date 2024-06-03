@@ -66,7 +66,7 @@ export class BrowserWebsocketSocket extends VirtualSocket {
 	}
 
 	public drop() {
-		super.dropAll()
+		super.dropAll();
 		this.socket.close();
 	}
 }

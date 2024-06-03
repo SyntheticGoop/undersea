@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { send } from "./send";
-import { Socket } from "../lib/Socket";
+import type { Socket } from "../lib/Socket";
 
 function wait(ms: number) {
 	if (ms === 0) return Promise.resolve();

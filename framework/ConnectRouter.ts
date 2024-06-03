@@ -1,4 +1,4 @@
-import { Socket as ISocket } from "../lib/Socket";
+import type { Socket as ISocket } from "../lib/Socket";
 
 declare const CONNECT_ROUTE: unique symbol;
 declare class ConnectRouteBrand {
@@ -34,8 +34,8 @@ export type ContextOverNull<App, Connection, Socket> = App extends null
 		? Context<null, null, Socket>
 		: Context<null, Connection, Socket>
 	: Connection extends null
-	  ? Context<App, null, Socket>
-	  : Context<App, Connection, Socket>;
+		? Context<App, null, Socket>
+		: Context<App, Connection, Socket>;
 
 declare const CLIENT_CONNECTOR: unique symbol;
 export declare class ClientConnectorBrand {

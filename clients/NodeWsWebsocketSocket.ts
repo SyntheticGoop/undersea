@@ -1,4 +1,4 @@
-import { type WebSocket } from "ws";
+import type { WebSocket } from "ws";
 
 import { VirtualSocket } from "./VirtualSocket";
 
@@ -69,7 +69,7 @@ export class NodeWsWebsocketSocket extends VirtualSocket {
 	}
 
 	public drop() {
-		super.dropAll()
+		super.dropAll();
 		this.socket.close();
 	}
 }

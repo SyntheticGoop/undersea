@@ -1,9 +1,9 @@
-import { Atomic } from "../lib/Atomic";
+import type { Atomic } from "../lib/Atomic";
 import { recv } from "./recv";
 import { send } from "./send";
-import { Protocol } from "./Protocol";
-import { Socket } from "../lib/Socket";
-import { CancellableResult, Task } from "../lib/Task";
+import type { Protocol } from "./Protocol";
+import type { Socket } from "../lib/Socket";
+import type { CancellableResult, Task } from "../lib/Task";
 import { match, brand } from "./Signal";
 
 /**

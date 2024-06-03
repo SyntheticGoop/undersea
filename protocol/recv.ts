@@ -1,7 +1,7 @@
 import { match } from "./Protocol";
-import { Socket } from "../lib/Socket";
-import { Task, TaskHandle } from "../lib/Task";
-import { Protocol } from "./Protocol";
+import type { Socket } from "../lib/Socket";
+import type { Task, TaskHandle } from "../lib/Task";
+import type { Protocol } from "./Protocol";
 
 /**
  * Receives data on a socket.

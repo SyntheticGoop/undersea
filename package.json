@@ -1,24 +1,25 @@
 {
-  "license": "GPL-3.0",
-  "name": "undersea",
-  "version": "0.0.15",
-  "description": "Typed streaming api engine",
-  "scripts": {
-    "test": "vitest"
-  },
-  "workspaces": [
-    "example"
-  ],
-  "devDependencies": {
-    "@biomejs/biome": "^1.7.3",
-    "@types/ws": "^8",
-    "typescript": "~5.0.0",
-    "vitest": "^1.2.2",
-    "ws": "~8.0.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5",
-    "ws": "^8"
-  },
-  "packageManager": "yarn@4.0.2"
+	"license": "GPL-3.0",
+	"name": "undersea",
+	"version": "0.0.15",
+	"description": "Typed streaming api engine",
+	"scripts": {
+		"test": "vitest",
+		"lint": "biome format --write . && biome lint --apply-unsafe ."
+	},
+	"workspaces": [
+		"example"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^1.7.3",
+		"@types/ws": "^8",
+		"typescript": "~5.0.0",
+		"vitest": "^1.2.2",
+		"ws": "~8.0.0"
+	},
+	"peerDependencies": {
+		"typescript": "^5",
+		"ws": "^8"
+	},
+	"packageManager": "yarn@4.0.2"
 }

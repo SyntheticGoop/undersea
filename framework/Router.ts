@@ -1,5 +1,5 @@
-import { Config } from "./Config";
-import { Codec } from "./Codec";
+import type { Config } from "./Config";
+import type { Codec } from "./Codec";
 import { Route } from "./Route";
 import { ConnectRouter } from "./ConnectRouter";
 
@@ -350,27 +350,27 @@ export class Router {
 					? Type extends "send"
 						? "asSend"
 						: Type extends "channel"
-						  ? "asSendChannel"
-						  : Type extends "stream"
-							  ? "asSendStream"
-							  : Type extends "listen"
-								  ? "asSendListen"
-								  : Type extends "duplex"
-									  ? "asSendDuplex"
-									  : never
+							? "asSendChannel"
+							: Type extends "stream"
+								? "asSendStream"
+								: Type extends "listen"
+									? "asSendListen"
+									: Type extends "duplex"
+										? "asSendDuplex"
+										: never
 					: Method extends `client ${infer Type}`
-					  ? Type extends "send"
+						? Type extends "send"
 							? "asRecv"
 							: Type extends "channel"
-							  ? "asRecvChannel"
-							  : Type extends "stream"
-								  ? "asRecvStream"
-								  : Type extends "listen"
-									  ? "asRecvListen"
-									  : Type extends "duplex"
-										  ? "asRecvDuplex"
-										  : never
-					  : never
+								? "asRecvChannel"
+								: Type extends "stream"
+									? "asRecvStream"
+									: Type extends "listen"
+										? "asRecvListen"
+										: Type extends "duplex"
+											? "asRecvDuplex"
+											: never
+						: never
 			>({
 				codec: self.context.codec,
 				config: { ...self.context.config, ...config },
@@ -385,27 +385,27 @@ export class Router {
 					? Type extends "send"
 						? "asSend"
 						: Type extends "channel"
-						  ? "asSendChannel"
-						  : Type extends "stream"
-							  ? "asSendStream"
-							  : Type extends "listen"
-								  ? "asSendListen"
-								  : Type extends "duplex"
-									  ? "asSendDuplex"
-									  : never
+							? "asSendChannel"
+							: Type extends "stream"
+								? "asSendStream"
+								: Type extends "listen"
+									? "asSendListen"
+									: Type extends "duplex"
+										? "asSendDuplex"
+										: never
 					: Method extends `server ${infer Type}`
-					  ? Type extends "send"
+						? Type extends "send"
 							? "asRecv"
 							: Type extends "channel"
-							  ? "asRecvChannel"
-							  : Type extends "stream"
-								  ? "asRecvStream"
-								  : Type extends "listen"
-									  ? "asRecvListen"
-									  : Type extends "duplex"
-										  ? "asRecvDuplex"
-										  : never
-					  : never
+								? "asRecvChannel"
+								: Type extends "stream"
+									? "asRecvStream"
+									: Type extends "listen"
+										? "asRecvListen"
+										: Type extends "duplex"
+											? "asRecvDuplex"
+											: never
+						: never
 			>({
 				codec: self.context.codec,
 				config: { ...self.context.config, ...config },
